@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>CastCrew Configuration</title>
+</head>
+<body>
+<div data-role="page" id="castCrewConfigurationPage" class="page type-interior pluginConfigurationPage fullWidthContent">
+    <div class="content-primary">
+        <div class="verticalSection">
+            <div class="sectionTitleContainer">
+                <h2 class="sectionTitle">CastCrew</h2>
+            </div>
+        </div>
+        <hr class="solid">
+
+        <form id="castCrewConfigurationForm">
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="defaultPageSize">Default Page Size</label>
+                <input is="emby-input" id="defaultPageSize" type="number" min="10" max="200" step="1" />
+                <div class="fieldDescription">Used by the Actors page if no explicit page size is provided.</div>
+            </div>
+
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="defaultSortBy">Default Sort</label>
+                <select is="emby-select" id="defaultSortBy" class="emby-select-withcolor emby-select">
+                    <option value="Name">Name</option>
+                    <option value="DateCreated">Recently Added</option>
+                </select>
+            </div>
+
+            <div class="checkboxContainer checkboxContainer-withDescription">
+                <label>
+                    <input id="enableCastCrewMainMenuEntry" is="emby-checkbox" type="checkbox" />
+                    <span>Show Cast & Crew entry in the top banner</span>
+                </label>
+                <div class="fieldDescription">Adds/removes a Cast & Crew link in the top banner (near Home/Favorites). A Jellyfin web reload may be required. On macOS app bundle installs, this requires a writable Jellyfin --webdir.</div>
+            </div>
+
+            <div class="inputContainer">
+                <label class="inputLabel inputLabelUnfocused" for="detailRoutePreference">Person Detail Route Preference</label>
+                <select is="emby-select" id="detailRoutePreference" class="emby-select-withcolor emby-select">
+                    <option value="Auto">Auto Detect</option>
+                    <option value="HashBang">Use #!/ routes</option>
+                    <option value="Hash">Use #/ routes</option>
+                </select>
+                <div class="fieldDescription">Controls fallback navigation for person detail pages across different jellyfin-web builds.</div>
+            </div>
+
+            <button is="emby-button" id="saveConfigButton" type="submit" class="raised button-submit block">
+                <span>Save</span>
+            </button>
+        </form>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            'use strict';
+
+            var configPage = document.querySelector('#castCrewConfigurationPage');
+
+            if (!configPage || configPage.dataset.castCrewConfigBound === 'true') {
+                return;
+            }
+
+            configPage.dataset.castCrewConfigBound = 'true';
+
+            var pluginId = 'a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a';
+            var minPageSize = 10;
+            var maxPageSize = 200;
+
+            var refs = {
+                form: document.getElementById('castCrewConfigurationForm'),
+                defaultPageSize: document.getElementById('defaultPageSize'),
+                defaultSortBy: document.getElementById('defaultSortBy'),
+                enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
+                detailRoutePreference: document.getElementById('detailRoutePreference')
+            };
+
+            function normalizePageSize(value) {
+                var parsed = parseInt(value, 10);
+                if (!Number.isFinite(parsed) || parsed <= 0) {
+                    return 50;
+                }
+
+                return Math.max(minPageSize, Math.min(maxPageSize, parsed));
+            }
+
+            function normalizeSortBy(value) {
+                return value === 'DateCreated' ? 'DateCreated' : 'Name';
+            }
+
+            function normalizeRoutePreference(value) {
+                if (value === 'HashBang' || value === 'Hash') {
+                    return value;
+                }
+
+                return 'Auto';
+            }
+
+            function applyConfig(config) {
+                refs.defaultPageSize.value = normalizePageSize(config.DefaultPageSize);
+                refs.defaultSortBy.value = normalizeSortBy(config.DefaultSortBy);
+                refs.enableCastCrewMainMenuEntry.checked = config.EnableCastCrewMainMenuEntry !== false;
+                refs.detailRoutePreference.value = normalizeRoutePreference(config.DetailRoutePreference);
+            }
+
+            function loadConfig() {
+                Dashboard.showLoadingMsg();
+
+                return window.ApiClient.getPluginConfiguration(pluginId)
+                    .then(function (config) {
+                        applyConfig(config || {});
+                    })
+                    .catch(function (error) {
+                        console.error(error);
+                    })
+                    .finally(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+            }
+
+            function saveConfig(event) {
+                event.preventDefault();
+                Dashboard.showLoadingMsg();
+
+                return window.ApiClient.getPluginConfiguration(pluginId)
+                    .then(function (existingConfig) {
+                        var config = existingConfig || {};
+                        config.DefaultPageSize = normalizePageSize(refs.defaultPageSize.value);
+                        config.DefaultSortBy = normalizeSortBy(refs.defaultSortBy.value);
+                        config.EnableCastCrewMainMenuEntry = refs.enableCastCrewMainMenuEntry.checked;
+                        config.DetailRoutePreference = normalizeRoutePreference(refs.detailRoutePreference.value);
+
+                        refs.defaultPageSize.value = config.DefaultPageSize;
+                        refs.defaultSortBy.value = config.DefaultSortBy;
+                        refs.detailRoutePreference.value = config.DetailRoutePreference;
+
+                        return window.ApiClient.updatePluginConfiguration(pluginId, config);
+                    })
+                    .then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
+                    })
+                    .catch(function (error) {
+                        console.error(error);
+                        Dashboard.alert({
+                            title: 'CastCrew',
+                            message: 'Failed to save configuration.'
+                        });
+                    })
+                    .finally(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+            }
+
+            refs.form.addEventListener('submit', saveConfig);
+
+            configPage.addEventListener('pageshow', function () {
+                loadConfig();
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>

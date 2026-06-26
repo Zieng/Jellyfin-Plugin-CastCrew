@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CastCrew</title>
+    <style>
+        :root {
+            --cw-bg: #0d1117;
+            --cw-panel: #161b22;
+            --cw-border: #2d333b;
+            --cw-text: #e6edf3;
+            --cw-muted: #9da7b3;
+            --cw-accent: #2f81f7;
+            --cw-danger: #f85149;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--cw-bg);
+            color: var(--cw-text);
+            font-family: "Segoe UI", "Noto Sans", sans-serif;
+        }
+
+        .castcrew-page {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px 16px 40px;
+        }
+
+        .castcrew-header {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .castcrew-title {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+
+        .castcrew-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .castcrew-input,
+        .castcrew-select,
+        .castcrew-button {
+            border: 1px solid var(--cw-border);
+            background: var(--cw-panel);
+            color: var(--cw-text);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+
+        .castcrew-input {
+            min-width: 240px;
+        }
+
+        .castcrew-button {
+            cursor: pointer;
+        }
+
+        .castcrew-button:hover {
+            border-color: var(--cw-accent);
+        }
+
+        .castcrew-meta {
+            color: var(--cw-muted);
+            margin: 8px 0 18px;
+            font-size: 13px;
+        }
+
+        .castcrew-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+        }
+
+        .castcrew-card {
+            border: 1px solid var(--cw-border);
+            background: var(--cw-panel);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 120ms ease, border-color 120ms ease;
+            text-align: left;
+        }
+
+        .castcrew-card:hover,
+        .castcrew-card:focus-visible {
+            transform: translateY(-2px);
+            border-color: var(--cw-accent);
+            outline: none;
+        }
+
+        .castcrew-image-wrap {
+            width: 100%;
+            aspect-ratio: 2 / 3;
+            background: #11161d;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .castcrew-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .castcrew-placeholder {
+            color: var(--cw-muted);
+            font-size: 12px;
+        }
+
+        .castcrew-info {
+            padding: 10px;
+        }
+
+        .castcrew-name {
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.35;
+        }
+
+        .castcrew-overview {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--cw-muted);
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 44px;
+        }
+
+        .castcrew-state {
+            border: 1px solid var(--cw-border);
+            background: var(--cw-panel);
+            color: var(--cw-text);
+            border-radius: 10px;
+            padding: 14px;
+            margin-top: 10px;
+        }
+
+        .castcrew-state.error {
+            border-color: rgba(248, 81, 73, 0.55);
+            color: #ffd6d3;
+        }
+
+        .castcrew-section {
+            margin-top: 20px;
+        }
+
+        .castcrew-section-header {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--cw-border);
+            color: var(--cw-text);
+        }
+
+        .castcrew-section-header .castcrew-match-count {
+            font-weight: 400;
+            color: var(--cw-muted);
+            font-size: 14px;
+            margin-left: 8px;
+        }
+
+        .castcrew-section-empty {
+            color: var(--cw-muted);
+            font-size: 14px;
+            padding: 12px 0;
+        }
+
+        .castcrew-section-divider {
+            border: none;
+            border-top: 1px solid var(--cw-border);
+            margin: 24px 0 4px;
+        }
+
+        .castcrew-pagination {
+            margin-top: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (max-width: 768px) {
+            .castcrew-title {
+                font-size: 24px;
+            }
+
+            .castcrew-input {
+                min-width: 170px;
+                width: 100%;
+            }
+
+            .castcrew-toolbar {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div data-role="page" id="castCrewPage" class="page type-interior pluginPage fullWidthContent">
+    <div class="content-primary">
+        <main class="castcrew-page" id="castcrewPage" role="main" aria-busy="true">
+            <div class="castcrew-header">
+                <h1 class="castcrew-title" id="actorsTitle">Actors</h1>
+                <div class="castcrew-toolbar">
+                    <label id="searchInputLabel" class="visually-hidden" for="searchInput">Search actors</label>
+                    <input id="searchInput" class="castcrew-input" type="search" placeholder="Search actors" />
+
+                    <label id="sortSelectLabel" class="visually-hidden" for="sortSelect">Sort actors</label>
+                    <select id="sortSelect" class="castcrew-select" aria-label="Sort actors">
+                        <option id="sortNameOption" value="Name">Name</option>
+                        <option id="sortDateCreatedOption" value="DateCreated">Recently Added</option>
+                    </select>
+
+                    <button id="searchButton" class="castcrew-button" type="button">Search</button>
+                </div>
+            </div>
+
+            <div id="meta" class="castcrew-meta" role="status" aria-live="polite">Loading...</div>
+            <div id="state" class="castcrew-state" role="status" aria-live="polite" hidden></div>
+            <div id="grid" class="castcrew-grid" hidden></div>
+
+            <div id="groupedResults" hidden>
+                <div class="castcrew-section" id="nameMatchSection">
+                    <h2 class="castcrew-section-header" id="nameMatchHeader">Name matches</h2>
+                    <div id="nameMatchGrid" class="castcrew-grid"></div>
+                    <p id="nameMatchEmpty" class="castcrew-section-empty" hidden></p>
+                </div>
+                <hr class="castcrew-section-divider" />
+                <div class="castcrew-section" id="descMatchSection">
+                    <h2 class="castcrew-section-header" id="descMatchHeader">Description matches</h2>
+                    <div id="descMatchGrid" class="castcrew-grid"></div>
+                    <p id="descMatchEmpty" class="castcrew-section-empty" hidden></p>
+                </div>
+            </div>
+
+            <div class="castcrew-pagination" role="navigation" aria-label="Actor pagination">
+                <button id="prevButton" class="castcrew-button" type="button">Previous</button>
+                <span id="pageInfo" class="castcrew-meta" aria-live="polite"></span>
+                <button id="nextButton" class="castcrew-button" type="button">Next</button>
+            </div>
+        </main>
+    </div>
+    
+
+<script>
+(function () {
+    'use strict';
+
+    var state = {
+        pageSize: 50,
+        pageIndex: 0,
+        searchTerm: '',
+        sortBy: 'Name',
+        totalCount: 0,
+        items: [],
+        nameMatchItems: null,
+        nameMatchCount: null,
+        descMatchItems: null,
+        descMatchCount: null,
+        loading: false,
+        userId: null,
+        routePreference: 'Auto',
+        locale: 'en'
+    };
+
+    var translations = {
+        en: {
+            titleActors: 'Actors',
+            searchLabel: 'Search actors',
+            searchPlaceholder: 'Search actors',
+            sortLabel: 'Sort actors',
+            sortName: 'Name',
+            sortDateCreated: 'Recently Added',
+            searchButton: 'Search',
+            loadingActors: 'Loading actors...',
+            totalActors: 'Total actors: {{total}}',
+            noActorsFound: 'No actors found in this query.',
+            noNameMatches: 'No name matches found.',
+            noDescMatches: 'No description matches found.',
+            nameMatchHeader: 'Name matches',
+            descMatchHeader: 'Description matches',
+            matchCount: '{{count}} Found',
+            noBiography: 'No biography available.',
+            noImage: 'No image',
+            failedLoadActors: 'Failed to load actors. {{message}}',
+            apiClientMissing: 'ApiClient is not available in this host page.',
+            pageOf: 'Page {{current}} / {{total}}',
+            previous: 'Previous',
+            next: 'Next',
+            openPersonDetails: 'Open details for {{name}}',
+            paginationLabel: 'Actor pagination'
+        },
+        zh: {
+            titleActors: '演员',
+            searchLabel: '搜索演员',
+            searchPlaceholder: '搜索演员',
+            sortLabel: '演员排序',
+            sortName: '名称',
+            sortDateCreated: '最近添加',
+            searchButton: '搜索',
+            loadingActors: '正在加载演员...',
+            totalActors: '演员总数：{{total}}',
+            noActorsFound: '此查询未找到演员。',
+            noNameMatches: '未找到名称匹配。',
+            noDescMatches: '未找到描述匹配。',
+            nameMatchHeader: '名称匹配',
+            descMatchHeader: '描述匹配',
+            matchCount: '找到 {{count}} 个',
+            noBiography: '暂无简介。',
+            noImage: '无图片',
+            failedLoadActors: '加载演员失败。{{message}}',
+            apiClientMissing: '当前宿主页面不可用 ApiClient。',
+            pageOf: '第 {{current}} / {{total}} 页',
+            previous: '上一页',
+            next: '下一页',
+            openPersonDetails: '打开 {{name}} 的详情页',
+            paginationLabel: '演员分页'
+        }
+    };
+
+    var refs = {
+        page: document.getElementById('castcrewPage'),
+        title: document.getElementById('actorsTitle'),
+        searchInputLabel: document.getElementById('searchInputLabel'),
+        searchInput: document.getElementById('searchInput'),
+        sortSelectLabel: document.getElementById('sortSelectLabel'),
+        sortSelect: document.getElementById('sortSelect'),
+        sortNameOption: document.getElementById('sortNameOption'),
+        sortDateCreatedOption: document.getElementById('sortDateCreatedOption'),
+        searchButton: document.getElementById('searchButton'),
+        meta: document.getElementById('meta'),
+        state: document.getElementById('state'),
+        grid: document.getElementById('grid'),
+        groupedResults: document.getElementById('groupedResults'),
+        nameMatchHeader: document.getElementById('nameMatchHeader'),
+        nameMatchGrid: document.getElementById('nameMatchGrid'),
+        nameMatchEmpty: document.getElementById('nameMatchEmpty'),
+        descMatchHeader: document.getElementById('descMatchHeader'),
+        descMatchGrid: document.getElementById('descMatchGrid'),
+        descMatchEmpty: document.getElementById('descMatchEmpty'),
+        prevButton: document.getElementById('prevButton'),
+        nextButton: document.getElementById('nextButton'),
+        pageInfo: document.getElementById('pageInfo'),
+        pagination: document.querySelector('.castcrew-pagination')
+    };
+    var hostPage = document.getElementById('castCrewPage');
+    var isInitialized = false;
+
+    if (!hostPage || hostPage.dataset.castCrewBound === 'true') {
+        return;
+    }
+
+    hostPage.dataset.castCrewBound = 'true';
+
+    function detectLocale() {
+        var language = (window.navigator && window.navigator.language ? window.navigator.language : 'en').toLowerCase();
+        if (language.indexOf('zh') === 0) {
+            return 'zh';
+        }
+
+        return 'en';
+    }
+
+    function t(key, params) {
+        var localeStrings = translations[state.locale] || translations.en;
+        var text = localeStrings[key] || translations.en[key] || key;
+
+        if (!params) {
+            return text;
+        }
+
+        return text.replace(/\{\{(\w+)\}\}/g, function (_, paramName) {
+            var value = params[paramName];
+            return value === undefined || value === null ? '' : String(value);
+        });
+    }
+
+    function applyStaticLocalization() {
+        refs.title.textContent = t('titleActors');
+        refs.searchInputLabel.textContent = t('searchLabel');
+        refs.searchInput.placeholder = t('searchPlaceholder');
+        refs.sortSelectLabel.textContent = t('sortLabel');
+        refs.sortSelect.setAttribute('aria-label', t('sortLabel'));
+        refs.sortNameOption.textContent = t('sortName');
+        refs.sortDateCreatedOption.textContent = t('sortDateCreated');
+        refs.searchButton.textContent = t('searchButton');
+        refs.prevButton.textContent = t('previous');
+        refs.nextButton.textContent = t('next');
+        refs.pagination.setAttribute('aria-label', t('paginationLabel'));
+    }
+
+    function getCurrentUserId() {
+        if (window.ApiClient && typeof window.ApiClient.getCurrentUserId === 'function') {
+            return window.ApiClient.getCurrentUserId();
+        }
+
+        if (window.ApiClient && window.ApiClient._serverInfo && window.ApiClient._serverInfo.UserId) {
+            return window.ApiClient._serverInfo.UserId;
+        }
+
+        return null;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function normalizeSortBy(value) {
+        return value === 'DateCreated' ? 'DateCreated' : 'Name';
+    }
+
+    function normalizeRoutePreference(value) {
+        if (value === 'HashBang' || value === 'Hash') {
+            return value;
+        }
+
+        return 'Auto';
+    }
+
+    function buildActorsUrl() {
+        var startIndex = state.pageIndex * state.pageSize;
+        var params = {
+            startIndex: startIndex,
+            limit: state.pageSize,
+            sortBy: state.sortBy
+        };
+
+        if (state.userId) {
+            params.userId = state.userId;
+        }
+
+        if (state.searchTerm) {
+            params.searchTerm = state.searchTerm;
+        }
+
+        return window.ApiClient.getUrl('CastCrew/Actors', params);
+    }
+
+    function getPrimaryImageUrl(person) {
+        if (!person || !person.Id || !person.PrimaryImageTag) {
+            return '';
+        }
+
+        return window.ApiClient.getUrl('Items/' + person.Id + '/Images/Primary', {
+            maxHeight: 480,
+            quality: 90,
+            tag: person.PrimaryImageTag
+        });
+    }
+
+    function getRoutePrefixes() {
+        var hash = window.location && typeof window.location.hash === 'string'
+            ? window.location.hash
+            : '';
+
+        if (state.routePreference === 'Hash') {
+            return ['#/', '#!/'];
+        }
+
+        if (state.routePreference === 'HashBang') {
+            return ['#!/', '#/'];
+        }
+
+        if (hash.indexOf('#/') === 0) {
+            return ['#/', '#!/'];
+        }
+
+        return ['#!/', '#/'];
+    }
+
+    function getDetailPathOrder() {
+        var hash = window.location && typeof window.location.hash === 'string'
+            ? window.location.hash.toLowerCase()
+            : '';
+
+        if (hash.indexOf('/person') !== -1) {
+            return ['person', 'details', 'item'];
+        }
+
+        if (hash.indexOf('/item') !== -1) {
+            return ['item', 'details', 'person'];
+        }
+
+        return ['details', 'item', 'person'];
+    }
+
+    function buildPersonRoutes(personId) {
+        var encodedPersonId = encodeURIComponent(personId);
+        var prefixes = getRoutePrefixes();
+        var detailPaths = getDetailPathOrder().map(function (path) {
+            return path + '?id=' + encodedPersonId;
+        });
+
+        var routes = [];
+
+        prefixes.forEach(function (prefix) {
+            detailPaths.forEach(function (path) {
+                routes.push(prefix + path);
+            });
+        });
+
+        return routes;
+    }
+
+    function openPersonDetail(person) {
+        if (!person || !person.Id) {
+            return;
+        }
+
+        var routes = buildPersonRoutes(person.Id);
+        var preferredRoute = routes[0];
+
+        if (window.Dashboard && typeof window.Dashboard.navigate === 'function') {
+            window.Dashboard.navigate(preferredRoute);
+            return;
+        }
+
+        if (window.history && typeof window.history.pushState === 'function' && window.location) {
+            window.location.hash = preferredRoute;
+            return;
+        }
+
+        window.location.href = './index.html' + preferredRoute;
+    }
+
+    function setLoading(loading) {
+        state.loading = loading;
+        refs.page.setAttribute('aria-busy', loading ? 'true' : 'false');
+    }
+
+    function renderState(message, isError) {
+        refs.state.hidden = false;
+        refs.state.className = isError ? 'castcrew-state error' : 'castcrew-state';
+        refs.state.setAttribute('role', isError ? 'alert' : 'status');
+        refs.state.textContent = message;
+        refs.grid.hidden = true;
+        refs.groupedResults.hidden = true;
+    }
+
+    function clearState() {
+        refs.state.hidden = true;
+        refs.state.textContent = '';
+        refs.state.setAttribute('role', 'status');
+    }
+
+    function buildCardsHtml(items) {
+        return items.map(function (person) {
+            var imageUrl = getPrimaryImageUrl(person);
+            var overview = person.Overview ? escapeHtml(person.Overview) : t('noBiography');
+            var actorName = person.Name || '';
+            var imageHtml = imageUrl
+                ? '<img class="castcrew-image" loading="lazy" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(actorName) + '">'
+                : '<span class="castcrew-placeholder">' + escapeHtml(t('noImage')) + '</span>';
+            var openLabel = t('openPersonDetails', { name: actorName });
+
+            return '' +
+                '<button class="castcrew-card" data-person-id="' + escapeHtml(person.Id) + '" aria-label="' + escapeHtml(openLabel) + '" type="button">' +
+                    '<div class="castcrew-image-wrap">' + imageHtml + '</div>' +
+                    '<div class="castcrew-info">' +
+                        '<h2 class="castcrew-name">' + escapeHtml(actorName) + '</h2>' +
+                        '<p class="castcrew-overview">' + overview + '</p>' +
+                    '</div>' +
+                '</button>';
+        }).join('');
+    }
+
+    function bindCardClicks(gridEl, items) {
+        gridEl.querySelectorAll('.castcrew-card').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var personId = button.getAttribute('data-person-id');
+                var person = items.find(function (item) {
+                    return item.Id === personId;
+                });
+                openPersonDetail(person);
+            });
+        });
+    }
+
+    function renderGrid() {
+        // Grouped search results mode
+        if (state.nameMatchItems !== null && state.nameMatchItems !== undefined) {
+            renderGroupedResults();
+            return;
+        }
+
+        // Flat list mode (no search term)
+        refs.groupedResults.hidden = true;
+        if (!state.items.length) {
+            renderState(t('noActorsFound'), false);
+            return;
+        }
+
+        clearState();
+        refs.grid.hidden = false;
+        refs.grid.innerHTML = buildCardsHtml(state.items);
+        bindCardClicks(refs.grid, state.items);
+    }
+
+    function renderGroupedResults() {
+        clearState();
+        refs.grid.hidden = true;
+        refs.groupedResults.hidden = false;
+
+        var nameCount = state.nameMatchCount || 0;
+        var descCount = state.descMatchCount || 0;
+        var nameItems = state.nameMatchItems || [];
+        var descItems = state.descMatchItems || [];
+
+        // Name matches section header
+        refs.nameMatchHeader.innerHTML = escapeHtml(t('nameMatchHeader')) +
+            ' <span class="castcrew-match-count">' + escapeHtml(t('matchCount', { count: nameCount })) + '</span>';
+
+        // Name matches grid
+        if (nameItems.length > 0) {
+            refs.nameMatchGrid.hidden = false;
+            refs.nameMatchEmpty.hidden = true;
+            refs.nameMatchGrid.innerHTML = buildCardsHtml(nameItems);
+            bindCardClicks(refs.nameMatchGrid, nameItems);
+        } else {
+            refs.nameMatchGrid.hidden = true;
+            refs.nameMatchGrid.innerHTML = '';
+            refs.nameMatchEmpty.hidden = false;
+            refs.nameMatchEmpty.textContent = t('noNameMatches');
+        }
+
+        // Description matches section header
+        refs.descMatchHeader.innerHTML = escapeHtml(t('descMatchHeader')) +
+            ' <span class="castcrew-match-count">' + escapeHtml(t('matchCount', { count: descCount })) + '</span>';
+
+        // Description matches grid
+        if (descItems.length > 0) {
+            refs.descMatchGrid.hidden = false;
+            refs.descMatchEmpty.hidden = true;
+            refs.descMatchGrid.innerHTML = buildCardsHtml(descItems);
+            bindCardClicks(refs.descMatchGrid, descItems);
+        } else {
+            refs.descMatchGrid.hidden = true;
+            refs.descMatchGrid.innerHTML = '';
+            refs.descMatchEmpty.hidden = false;
+            refs.descMatchEmpty.textContent = t('noDescMatches');
+        }
+    }
+
+    function renderPagination() {
+        // Hide pagination in grouped search mode
+        if (state.nameMatchItems !== null && state.nameMatchItems !== undefined) {
+            refs.pagination.hidden = true;
+            return;
+        }
+        refs.pagination.hidden = false;
+        var totalPages = Math.max(1, Math.ceil(state.totalCount / state.pageSize));
+        refs.pageInfo.textContent = t('pageOf', {
+            current: state.pageIndex + 1,
+            total: totalPages
+        });
+        refs.prevButton.disabled = state.pageIndex === 0 || state.loading;
+        refs.nextButton.disabled = (state.pageIndex + 1) >= totalPages || state.loading;
+    }
+
+    function renderMeta() {
+        refs.meta.textContent = state.loading
+            ? t('loadingActors')
+            : t('totalActors', { total: state.totalCount });
+    }
+
+    function fetchActors() {
+        setLoading(true);
+        renderMeta();
+        renderPagination();
+
+        var url = buildActorsUrl();
+        var requestPromise;
+
+        if (window.ApiClient && typeof window.ApiClient.getJSON === 'function') {
+            requestPromise = window.ApiClient.getJSON(url);
+        } else {
+            var headers = { 'Accept': 'application/json' };
+            if (window.ApiClient && typeof window.ApiClient.getRequestHeaders === 'function') {
+                headers = window.ApiClient.getRequestHeaders();
+            }
+
+            requestPromise = fetch(url, {
+                method: 'GET',
+                headers: headers
+            }).then(function (response) {
+                if (!response.ok) {
+                    throw new Error('Request failed with status ' + response.status);
+                }
+
+                return response.json();
+            });
+        }
+
+        return requestPromise
+            .then(function (payload) {
+                state.items = payload && payload.Items ? payload.Items : [];
+                state.totalCount = payload && typeof payload.TotalRecordCount === 'number'
+                    ? payload.TotalRecordCount
+                    : 0;
+
+                if (payload && typeof payload.PageSize === 'number' && payload.PageSize > 0) {
+                    state.pageSize = payload.PageSize;
+                }
+
+                if (payload && typeof payload.StartIndex === 'number' && state.pageSize > 0) {
+                    state.pageIndex = Math.floor(payload.StartIndex / state.pageSize);
+                }
+
+                // Store grouped search results if present
+                state.nameMatchItems = payload && payload.NameMatchItems ? payload.NameMatchItems : null;
+                state.nameMatchCount = payload && typeof payload.NameMatchCount === 'number' ? payload.NameMatchCount : null;
+                state.descMatchItems = payload && payload.DescriptionMatchItems ? payload.DescriptionMatchItems : null;
+                state.descMatchCount = payload && typeof payload.DescriptionMatchCount === 'number' ? payload.DescriptionMatchCount : null;
+
+                state.sortBy = normalizeSortBy(payload && payload.SortBy ? payload.SortBy : state.sortBy);
+                state.routePreference = normalizeRoutePreference(payload && payload.DetailRoutePreference ? payload.DetailRoutePreference : state.routePreference);
+                refs.sortSelect.value = state.sortBy;
+
+                renderGrid();
+            })
+            .catch(function (error) {
+                renderState(t('failedLoadActors', {
+                    message: (error && error.message ? error.message : '')
+                }), true);
+            })
+            .finally(function () {
+                setLoading(false);
+                renderMeta();
+                renderPagination();
+            });
+    }
+
+    function runSearch() {
+        state.searchTerm = refs.searchInput.value.trim();
+        state.sortBy = normalizeSortBy(refs.sortSelect.value);
+        state.pageIndex = 0;
+        fetchActors();
+    }
+
+    function initialize() {
+        if (isInitialized) {
+            return;
+        }
+
+        isInitialized = true;
+        state.locale = detectLocale();
+        applyStaticLocalization();
+
+        if (!window.ApiClient || typeof window.ApiClient.getUrl !== 'function') {
+            renderState(t('apiClientMissing'), true);
+            return;
+        }
+
+        state.userId = getCurrentUserId();
+        refs.sortSelect.value = state.sortBy;
+
+        refs.searchButton.addEventListener('click', runSearch);
+        refs.searchInput.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                runSearch();
+            }
+        });
+
+        refs.sortSelect.addEventListener('change', runSearch);
+
+        refs.prevButton.addEventListener('click', function () {
+            if (state.pageIndex > 0) {
+                state.pageIndex -= 1;
+                fetchActors();
+            }
+        });
+
+        refs.nextButton.addEventListener('click', function () {
+            var totalPages = Math.max(1, Math.ceil(state.totalCount / state.pageSize));
+            if ((state.pageIndex + 1) < totalPages) {
+                state.pageIndex += 1;
+                fetchActors();
+            }
+        });
+
+        fetchActors();
+    }
+
+    hostPage.addEventListener('pageshow', function () {
+        if (!isInitialized) {
+            initialize();
+            return;
+        }
+
+        state.userId = getCurrentUserId();
+        fetchActors();
+    });
+
+    initialize();
+})();
+</script>
+</div>
+</body>
+</html>

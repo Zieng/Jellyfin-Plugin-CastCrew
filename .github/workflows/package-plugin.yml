@@ -1,0 +1,160 @@
+name: Package CastCrew Plugin
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore plugin dependencies
+        run: dotnet restore src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj
+
+      - name: Build plugin
+        run: dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --configuration Release
+
+      - name: Run integration test project (opt-in tests remain skipped by default)
+        run: dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --configuration Release
+
+      - name: Read plugin version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n '/<Version>/{s:.*<Version>\(.*\)</Version>.*:\1:p;q;}' src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj)"
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "folder_10_10=CastCrew_${version}_jellyfin-10.10" >> "$GITHUB_OUTPUT"
+          echo "folder_10_11=CastCrew_${version}_jellyfin-10.11" >> "$GITHUB_OUTPUT"
+          echo "zip_10_10=CastCrew_${version}_jellyfin-10.10.zip" >> "$GITHUB_OUTPUT"
+          echo "zip_10_11=CastCrew_${version}_jellyfin-10.11.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Publish plugin assemblies
+        shell: bash
+        run: |
+          dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --framework net8.0 --no-build --output artifacts/publish-net8
+          dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --framework net9.0 --no-build --output artifacts/publish-net9
+
+      - name: Prepare Jellyfin plugin folders
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Jellyfin 10.10.x package (net8.0 build)
+          pkg10="artifacts/${{ steps.version.outputs.folder_10_10 }}"
+          mkdir -p "$pkg10"
+          cp artifacts/publish-net8/Jellyfin.Plugin.CastCrew.dll "$pkg10/"
+          if [[ -f artifacts/publish-net8/Jellyfin.Plugin.CastCrew.pdb ]]; then
+            cp artifacts/publish-net8/Jellyfin.Plugin.CastCrew.pdb "$pkg10/"
+          fi
+          # Jellyfin 10.11.x package (net9.0 build)
+          pkg11="artifacts/${{ steps.version.outputs.folder_10_11 }}"
+          mkdir -p "$pkg11"
+          cp artifacts/publish-net9/Jellyfin.Plugin.CastCrew.dll "$pkg11/"
+          if [[ -f artifacts/publish-net9/Jellyfin.Plugin.CastCrew.pdb ]]; then
+            cp artifacts/publish-net9/Jellyfin.Plugin.CastCrew.pdb "$pkg11/"
+          fi
+
+      - name: Zip plugin artifacts
+        working-directory: artifacts
+        run: |
+          zip -r "${{ steps.version.outputs.zip_10_10 }}" "${{ steps.version.outputs.folder_10_10 }}"
+          zip -r "${{ steps.version.outputs.zip_10_11 }}" "${{ steps.version.outputs.folder_10_11 }}"
+
+      - name: Compute checksums
+        id: checksum
+        working-directory: artifacts
+        shell: bash
+        run: |
+          md5_10_10=$(md5sum "${{ steps.version.outputs.zip_10_10 }}" | awk '{print $1}')
+          md5_10_11=$(md5sum "${{ steps.version.outputs.zip_10_11 }}" | awk '{print $1}')
+          echo "md5_10_10=$md5_10_10" >> "$GITHUB_OUTPUT"
+          echo "md5_10_11=$md5_10_11" >> "$GITHUB_OUTPUT"
+
+      - name: Generate plugin repository manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.value }}"
+          repo_url="https://github.com/${{ github.repository }}/releases/download/v${version}"
+          timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > artifacts/manifest.json << EOF
+          [
+            {
+              "guid": "a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a",
+              "name": "CastCrew",
+              "description": "Adds a Cast & Crew module to the Jellyfin sidebar for browsing actors, directors, producers, and other crew members.",
+              "overview": "Browse actors, directors, and producers in a dedicated Cast & Crew page within Jellyfin Web.",
+              "owner": "Zieng",
+              "category": "General",
+              "versions": [
+                {
+                  "version": "${version}",
+                  "changelog": "Multi-version support for Jellyfin 10.11.x (net9.0).",
+                  "targetAbi": "10.11.0.0",
+                  "sourceUrl": "${repo_url}/${{ steps.version.outputs.zip_10_11 }}",
+                  "checksum": "${{ steps.checksum.outputs.md5_10_11 }}",
+                  "timestamp": "${timestamp}"
+                },
+                {
+                  "version": "${version}",
+                  "changelog": "Multi-version support for Jellyfin 10.10.x (net8.0).",
+                  "targetAbi": "10.10.0.0",
+                  "sourceUrl": "${repo_url}/${{ steps.version.outputs.zip_10_10 }}",
+                  "checksum": "${{ steps.checksum.outputs.md5_10_10 }}",
+                  "timestamp": "${timestamp}"
+                }
+              ]
+            }
+          ]
+          EOF
+          echo "Generated manifest.json:"
+          cat artifacts/manifest.json
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: castcrew-plugin-packages
+          path: |
+            artifacts/${{ steps.version.outputs.zip_10_10 }}
+            artifacts/${{ steps.version.outputs.zip_10_11 }}
+            artifacts/manifest.json
+          if-no-files-found: error
+
+      - name: Attach artifacts to GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/${{ steps.version.outputs.zip_10_10 }}
+            artifacts/${{ steps.version.outputs.zip_10_11 }}
+
+      - name: Deploy manifest to GitHub Pages
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./artifacts
+          keep_files: false
+          destination_dir: .
+          include_files: manifest.json
