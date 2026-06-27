@@ -9,20 +9,20 @@
     "imageUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/raw/main/docs/images/logo.png",
     "versions": [
       {
-        "version": "0.1.0.3",
-        "changelog": "Fix the issue that the plugin does not work on windows installer based jellyfin.",
+        "version": "0.1.0.4",
+        "changelog": "Try to fix the issue that the plugin does not work on windows installer based jellyfin again.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.3_jellyfin-10.11.zip",
-        "checksum": "48c785f80747f2ad69847823e229fff7",
-        "timestamp": "2026-06-27T13:44:46Z"
+        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.4_jellyfin-10.11.zip",
+        "checksum": "a9ddd673b692973f33455b580444296b",
+        "timestamp": "2026-06-27T14:38:18Z"
       },
       {
-        "version": "0.1.0.3",
-        "changelog": "Fix the issue that the plugin does not work on windows installer based jellyfin.",
+        "version": "0.1.0.4",
+        "changelog": "Try to fix the issue that the plugin does not work on windows installer based jellyfin again.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.3_jellyfin-10.10.zip",
-        "checksum": "9def66d28c513a4dcd3a4e80e7e3fb37",
-        "timestamp": "2026-06-27T13:44:46Z"
+        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.4_jellyfin-10.10.zip",
+        "checksum": "cef6f0fd08a0abd241d8d8124e70c4fc",
+        "timestamp": "2026-06-27T14:38:18Z"
       }
     ]
   }
