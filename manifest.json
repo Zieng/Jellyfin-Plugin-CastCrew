@@ -13,16 +13,16 @@
         "changelog": "Fix the checksum mismatch.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.2_jellyfin-10.11.zip",
-        "checksum": "af2f36b92e0ec5b778a1376687838a9d",
-        "timestamp": "2026-06-27T11:22:38Z"
+        "checksum": "1a2d5b0c6fb86d8a99287f04291f3110",
+        "timestamp": "2026-06-27T12:17:25Z"
       },
       {
         "version": "0.1.0.2",
         "changelog": "Fix the checksum mismatch.",
         "targetAbi": "10.10.0.0",
         "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.2_jellyfin-10.10.zip",
-        "checksum": "300e3915769ea05b2c401c4b57f25785",
-        "timestamp": "2026-06-27T11:22:38Z"
+        "checksum": "e2d3a77d91a473c7fb0323d44944f95e",
+        "timestamp": "2026-06-27T12:17:25Z"
       }
     ]
   }
