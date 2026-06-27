@@ -233,6 +233,146 @@ public sealed class CastCrewWebConfigPatcherTests
         Assert.Equal("Failed", result!.ToString());
     }
 
+    [Fact]
+    public void TryConfigureUserWebDirFallback_WindowsMode_CopiesWebRoot_AndSetsUserEnvVar()
+    {
+        var sourceWebRoot = CreateTemporaryWebRoot();
+        var localAppDataRoot = Path.Combine(
+            Path.GetTempPath(),
+            "castcrew-localapp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(localAppDataRoot);
+
+        try
+        {
+            var nestedDir = Path.Combine(sourceWebRoot, "nested");
+            Directory.CreateDirectory(nestedDir);
+            File.WriteAllText(Path.Combine(sourceWebRoot, "config.json"), "{ \"menuLinks\": [] }");
+            File.WriteAllText(Path.Combine(sourceWebRoot, "index.html"), "<html></html>");
+            File.WriteAllText(Path.Combine(nestedDir, "child.txt"), "value");
+
+            string? envName = null;
+            string? envValue = null;
+            EnvironmentVariableTarget? envTarget = null;
+
+            void SetEnvVar(string name, string value, EnvironmentVariableTarget target)
+            {
+                envName = name;
+                envValue = value;
+                envTarget = target;
+            }
+
+            var result = InvokeTryConfigureUserWebDirFallback(
+                sourceWebRoot,
+                isWindows: true,
+                localAppDataRoot,
+                SetEnvVar);
+
+            Assert.True(result);
+
+            var expectedTargetWebRoot = Path.Combine(localAppDataRoot, "Jellyfin", "custom-web");
+            Assert.True(File.Exists(Path.Combine(expectedTargetWebRoot, "config.json")));
+            Assert.True(File.Exists(Path.Combine(expectedTargetWebRoot, "index.html")));
+            Assert.True(File.Exists(Path.Combine(expectedTargetWebRoot, "nested", "child.txt")));
+
+            Assert.Equal("JELLYFIN_WEB_DIR", envName);
+            Assert.Equal(expectedTargetWebRoot, envValue);
+            Assert.Equal(EnvironmentVariableTarget.User, envTarget);
+        }
+        finally
+        {
+            Directory.Delete(sourceWebRoot, recursive: true);
+            Directory.Delete(localAppDataRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void TryConfigureUserWebDirFallback_WindowsMode_InvokesTrayRefreshWithFallbackPath()
+    {
+        var sourceWebRoot = CreateTemporaryWebRoot();
+        var localAppDataRoot = Path.Combine(
+            Path.GetTempPath(),
+            "castcrew-localapp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(localAppDataRoot);
+
+        try
+        {
+            File.WriteAllText(Path.Combine(sourceWebRoot, "config.json"), "{ \"menuLinks\": [] }");
+            File.WriteAllText(Path.Combine(sourceWebRoot, "index.html"), "<html></html>");
+
+            string? refreshedPath = null;
+
+            void SetEnvVar(string name, string value, EnvironmentVariableTarget target)
+            {
+            }
+
+            void RefreshTray(string path)
+            {
+                refreshedPath = path;
+            }
+
+            var result = InvokeTryConfigureUserWebDirFallbackWithTrayRefresh(
+                sourceWebRoot,
+                isWindows: true,
+                localAppDataRoot,
+                SetEnvVar,
+                RefreshTray);
+
+            Assert.True(result);
+            Assert.Equal(Path.Combine(localAppDataRoot, "Jellyfin", "custom-web"), refreshedPath);
+        }
+        finally
+        {
+            Directory.Delete(sourceWebRoot, recursive: true);
+            Directory.Delete(localAppDataRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void TryConfigureUserWebDirFallback_WindowsMode_AlreadyConfigured_StillInvokesTrayRefresh()
+    {
+        var sourceWebRoot = CreateTemporaryWebRoot();
+        var localAppDataRoot = Path.Combine(
+            Path.GetTempPath(),
+            "castcrew-localapp-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(localAppDataRoot);
+
+        var fallbackWebRoot = Path.Combine(localAppDataRoot, "Jellyfin", "custom-web");
+        Directory.CreateDirectory(fallbackWebRoot);
+        File.WriteAllText(Path.Combine(fallbackWebRoot, "config.json"), "{ \"menuLinks\": [] }");
+        File.WriteAllText(Path.Combine(fallbackWebRoot, "index.html"), "<html></html>");
+
+        try
+        {
+            string? refreshedPath = null;
+            var expectedFallbackWebRoot = Path.Combine(localAppDataRoot, "Jellyfin", "custom-web");
+
+            void SetEnvVar(string name, string value, EnvironmentVariableTarget target)
+            {
+            }
+
+            void RefreshTray(string path)
+            {
+                refreshedPath = path;
+            }
+
+            var result = InvokeTryConfigureUserWebDirFallbackWithTrayRefreshAndConfiguredValue(
+                sourceWebRoot,
+                isWindows: true,
+                localAppDataRoot,
+                SetEnvVar,
+                RefreshTray,
+                expectedFallbackWebRoot);
+
+            Assert.True(result);
+            Assert.Equal(expectedFallbackWebRoot, refreshedPath);
+        }
+        finally
+        {
+            Directory.Delete(sourceWebRoot, recursive: true);
+            Directory.Delete(localAppDataRoot, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryWebRoot()
     {
         var path = Path.Combine(
@@ -297,5 +437,74 @@ public sealed class CastCrewWebConfigPatcherTests
         var method = type!.GetMethod("SyncCastCrewMenuLink", BindingFlags.Public | BindingFlags.Static);
         Assert.NotNull(method);
         return method!.Invoke(null, new object?[] { webRoot, enabled, null });
+    }
+
+    private static bool InvokeTryConfigureUserWebDirFallback(
+        string sourceWebRoot,
+        bool isWindows,
+        string localAppDataRoot,
+        Action<string, string, EnvironmentVariableTarget> setEnvVar)
+    {
+        var assembly = typeof(CastCrewPlugin).Assembly;
+        var type = assembly.GetType("Jellyfin.Plugin.CastCrew.CastCrewWebConfigPatcher", throwOnError: true);
+        Assert.NotNull(type);
+
+        var method = type!.GetMethod(
+            "TryConfigureUserWebDirFallback",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var result = method!.Invoke(null, new object?[] { sourceWebRoot, isWindows, null, localAppDataRoot, setEnvVar, null, null });
+        Assert.NotNull(result);
+        return (bool)result!;
+    }
+
+    private static bool InvokeTryConfigureUserWebDirFallbackWithTrayRefresh(
+        string sourceWebRoot,
+        bool isWindows,
+        string localAppDataRoot,
+        Action<string, string, EnvironmentVariableTarget> setEnvVar,
+        Action<string> refreshTray,
+        Func<string, EnvironmentVariableTarget, string?>? readEnvVar = null)
+    {
+        var assembly = typeof(CastCrewPlugin).Assembly;
+        var type = assembly.GetType("Jellyfin.Plugin.CastCrew.CastCrewWebConfigPatcher", throwOnError: true);
+        Assert.NotNull(type);
+
+        var method = type!.GetMethod(
+            "TryConfigureUserWebDirFallback",
+            BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var result = method!.Invoke(null, new object?[] { sourceWebRoot, isWindows, null, localAppDataRoot, setEnvVar, refreshTray, readEnvVar });
+        Assert.NotNull(result);
+        return (bool)result!;
+    }
+
+    private static bool InvokeTryConfigureUserWebDirFallbackWithTrayRefreshAndConfiguredValue(
+        string sourceWebRoot,
+        bool isWindows,
+        string localAppDataRoot,
+        Action<string, string, EnvironmentVariableTarget> setEnvVar,
+        Action<string> refreshTray,
+        string configuredValue)
+    {
+        string? ReadEnvVar(string name, EnvironmentVariableTarget _)
+        {
+            if (string.Equals(name, "JELLYFIN_WEB_DIR", StringComparison.Ordinal))
+            {
+                return configuredValue;
+            }
+
+            return null;
+        }
+
+        return InvokeTryConfigureUserWebDirFallbackWithTrayRefresh(
+            sourceWebRoot,
+            isWindows,
+            localAppDataRoot,
+            setEnvVar,
+            refreshTray,
+            ReadEnvVar);
     }
 }

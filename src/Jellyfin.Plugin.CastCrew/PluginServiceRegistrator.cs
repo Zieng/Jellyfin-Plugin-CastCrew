@@ -10,5 +10,6 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         serviceCollection.AddSingleton<CastCrewActorQueryService>();
+        serviceCollection.AddHostedService<CastCrewStartupSyncHostedService>();
     }
 }

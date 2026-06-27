@@ -1,4 +1,8 @@
 using System.Globalization;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Security;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
@@ -25,6 +29,7 @@ internal static class CastCrewWebConfigPatcher
     private const string ConfigFileName = "config.json";
     private const string IndexFileName = "index.html";
     private const string TopBannerScriptTag = "<script src=\"castcrew-top-banner-link.js\" defer></script>";
+    private const string JellyfinWebDirEnvVar = "JELLYFIN_WEB_DIR";
 
     public static CastCrewWebConfigSyncStatus SyncCastCrewMenuLink(string? webPath, bool enabled, ILogger? logger = null)
     {
@@ -139,6 +144,25 @@ internal static class CastCrewWebConfigPatcher
         catch (UnauthorizedAccessException ex)
         {
             Log(logger, LogLevel.Error, "Unable to sync menu link: access denied to web root. Installer-based web roots (for example Program Files) are often read-only; use a writable --webdir or grant Jellyfin write access. {0}", ex.Message);
+
+            var configuredFallback = TryConfigureUserWebDirFallback(
+                webPath,
+                OperatingSystem.IsWindows(),
+                logger,
+                null,
+                Environment.SetEnvironmentVariable,
+                fallbackWebRoot => TryRestartWindowsTrayWithWebDir(fallbackWebRoot, logger),
+                null);
+
+            if (configuredFallback)
+            {
+                Log(
+                    logger,
+                    LogLevel.Warning,
+                    "Configured user-level '{0}' fallback for writable Jellyfin web assets. Restart Jellyfin to apply.",
+                    JellyfinWebDirEnvVar);
+            }
+
             return CastCrewWebConfigSyncStatus.FailedNeedsWritableWebRoot;
         }
         catch (JsonException ex)
@@ -333,6 +357,226 @@ internal static class CastCrewWebConfigPatcher
         link[key] = value;
         return true;
     }
+
+    private static bool TryConfigureUserWebDirFallback(
+        string sourceWebRoot,
+        bool isWindows,
+        ILogger? logger,
+        string? localAppDataRoot,
+        Action<string, string, EnvironmentVariableTarget> setEnvironmentVariable,
+        Action<string>? refreshTrayWithWebDir,
+        Func<string, EnvironmentVariableTarget, string?>? getEnvironmentVariable)
+    {
+        if (!isWindows || string.IsNullOrWhiteSpace(sourceWebRoot) || !Directory.Exists(sourceWebRoot))
+        {
+            return false;
+        }
+
+        var localAppData = localAppDataRoot;
+        if (string.IsNullOrWhiteSpace(localAppData))
+        {
+            localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        }
+
+        if (string.IsNullOrWhiteSpace(localAppData))
+        {
+            Log(logger, LogLevel.Warning, "Unable to configure writable web root fallback: LocalApplicationData path is empty.");
+            return false;
+        }
+
+        var fallbackWebRoot = Path.Combine(localAppData, "Jellyfin", "custom-web");
+        var fallbackConfigPath = Path.Combine(fallbackWebRoot, ConfigFileName);
+        var fallbackIndexPath = Path.Combine(fallbackWebRoot, IndexFileName);
+
+        try
+        {
+            var readEnvironmentVariable = getEnvironmentVariable ?? Environment.GetEnvironmentVariable;
+            var configuredWebDir = readEnvironmentVariable(JellyfinWebDirEnvVar, EnvironmentVariableTarget.User);
+            if (string.Equals(configuredWebDir, fallbackWebRoot, StringComparison.OrdinalIgnoreCase) &&
+                File.Exists(fallbackConfigPath) &&
+                File.Exists(fallbackIndexPath))
+            {
+                refreshTrayWithWebDir?.Invoke(fallbackWebRoot);
+                return true;
+            }
+
+            MirrorDirectory(sourceWebRoot, fallbackWebRoot);
+            setEnvironmentVariable(JellyfinWebDirEnvVar, fallbackWebRoot, EnvironmentVariableTarget.User);
+            NotifyEnvironmentChanged(logger);
+            refreshTrayWithWebDir?.Invoke(fallbackWebRoot);
+            return true;
+        }
+        catch (ArgumentException ex)
+        {
+            Log(logger, LogLevel.Warning, "Unable to configure writable web root fallback: invalid path. {0}", ex.Message);
+            return false;
+        }
+        catch (SecurityException ex)
+        {
+            Log(logger, LogLevel.Warning, "Unable to configure writable web root fallback: security restriction. {0}", ex.Message);
+            return false;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log(logger, LogLevel.Warning, "Unable to configure writable web root fallback: access denied. {0}", ex.Message);
+            return false;
+        }
+        catch (IOException ex)
+        {
+            Log(logger, LogLevel.Warning, "Unable to configure writable web root fallback: I/O failure. {0}", ex.Message);
+            return false;
+        }
+    }
+
+    private static void TryRestartWindowsTrayWithWebDir(string fallbackWebRoot, ILogger? logger)
+    {
+        if (!OperatingSystem.IsWindows() || string.IsNullOrWhiteSpace(fallbackWebRoot))
+        {
+            return;
+        }
+
+        foreach (var trayProcess in Process.GetProcessesByName("Jellyfin.Windows.Tray"))
+        {
+            using (trayProcess)
+            {
+                string? trayExecutablePath;
+                try
+                {
+                    trayExecutablePath = trayProcess.MainModule?.FileName;
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to inspect Jellyfin tray process before restart. {0}", ex.Message);
+                    continue;
+                }
+                catch (Win32Exception ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to inspect Jellyfin tray process before restart. {0}", ex.Message);
+                    continue;
+                }
+                catch (NotSupportedException ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to inspect Jellyfin tray process before restart. {0}", ex.Message);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(trayExecutablePath) || !File.Exists(trayExecutablePath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    trayProcess.Kill(entireProcessTree: false);
+                    trayProcess.WaitForExit(5000);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to restart Jellyfin tray process. {0}", ex.Message);
+                    continue;
+                }
+                catch (NotSupportedException ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to restart Jellyfin tray process. {0}", ex.Message);
+                    continue;
+                }
+                catch (Win32Exception ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to restart Jellyfin tray process. {0}", ex.Message);
+                    continue;
+                }
+
+                var startInfo = new ProcessStartInfo(trayExecutablePath)
+                {
+                    UseShellExecute = false,
+                };
+                startInfo.Environment[JellyfinWebDirEnvVar] = fallbackWebRoot;
+
+                try
+                {
+                    _ = Process.Start(startInfo);
+                    Log(logger, LogLevel.Information, "Restarted Jellyfin tray process with '{0}' for future server restarts.", JellyfinWebDirEnvVar);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to launch Jellyfin tray process after restart. {0}", ex.Message);
+                }
+                catch (Win32Exception ex)
+                {
+                    Log(logger, LogLevel.Warning, "Unable to launch Jellyfin tray process after restart. {0}", ex.Message);
+                }
+
+                return;
+            }
+        }
+    }
+
+    private static void MirrorDirectory(string sourceRoot, string targetRoot)
+    {
+        Directory.CreateDirectory(targetRoot);
+
+        foreach (var sourceDirectory in Directory.GetDirectories(sourceRoot, "*", SearchOption.TopDirectoryOnly))
+        {
+            var directoryName = Path.GetFileName(sourceDirectory);
+            if (string.IsNullOrWhiteSpace(directoryName))
+            {
+                continue;
+            }
+
+            var targetDirectory = Path.Combine(targetRoot, directoryName);
+            MirrorDirectory(sourceDirectory, targetDirectory);
+        }
+
+        foreach (var sourceFile in Directory.GetFiles(sourceRoot, "*", SearchOption.TopDirectoryOnly))
+        {
+            var fileName = Path.GetFileName(sourceFile);
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                continue;
+            }
+
+            var targetFile = Path.Combine(targetRoot, fileName);
+            File.Copy(sourceFile, targetFile, overwrite: true);
+        }
+    }
+
+    private static void NotifyEnvironmentChanged(ILogger? logger)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            SendMessageTimeout(
+                new IntPtr(0xFFFF),
+                0x001A,
+                IntPtr.Zero,
+                "Environment",
+                0x0002,
+                2000,
+                out _);
+        }
+        catch (EntryPointNotFoundException ex)
+        {
+            Log(logger, LogLevel.Warning, "Unable to broadcast environment change notification. {0}", ex.Message);
+        }
+        catch (DllNotFoundException ex)
+        {
+            Log(logger, LogLevel.Warning, "Unable to broadcast environment change notification. {0}", ex.Message);
+        }
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr SendMessageTimeout(
+        IntPtr hWnd,
+        uint msg,
+        IntPtr wParam,
+        string lParam,
+        uint fuFlags,
+        uint uTimeout,
+        out IntPtr lpdwResult);
 
     private static void Log(ILogger? logger, LogLevel level, string message, params object[] args)
     {

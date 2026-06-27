@@ -54,7 +54,7 @@ When making changes to architecture/workflow conventions, keep these locations i
 - `CastCrewController` delegates actor querying to `CastCrewActorQueryService`, which uses `ILibraryManager` + `IDtoService` and normalizes query/config behavior via `CastCrewActorQueryNormalizer`.
 - Admin settings are served by embedded `Configuration/config.html` and persisted through `PluginConfiguration`.
 - Key plugin config values: `DefaultPageSize`, `DefaultSortBy`, `EnableCastCrewMainMenuEntry`, `DetailRoutePreference`.
-- CastCrew sidebar/top-banner auto-sync requires a writable Jellyfin web root (`/web/config.json` and `/web/index.html` updates). Installer defaults such as `Program Files` on Windows or `/Applications` on macOS are often read-only unless Jellyfin is launched with a writable `--webdir`.
+- CastCrew sidebar/top-banner auto-sync requires writable Jellyfin web assets (`/web/config.json` and `/web/index.html` updates). Windows installer runs that hit read-only `Program Files` web roots bootstrap `%LOCALAPPDATA%\Jellyfin\custom-web`, set user `JELLYFIN_WEB_DIR`, and refresh running Jellyfin tray launcher context for subsequent tray restarts; other hosts still need a writable `--webdir`.
 - Integration tests are opt-in (`CASTCREW_RUN_INTEGRATION_TESTS=true`) and require a live Jellyfin host plus credentials.
 - Packaging/release automation is implemented in `.github/workflows/package-plugin.yml`, producing `CastCrew_<Version>.zip` artifacts from release builds. The workflow runs on `ubuntu-latest`, but the produced package is host-platform agnostic for Jellyfin Linux/Windows/macOS.
 - `DESIGN.md` is the canonical implementation baseline and milestone source for this plugin.
@@ -63,7 +63,7 @@ When making changes to architecture/workflow conventions, keep these locations i
 
 - Keep plugin identity and navigation metadata stable unless intentionally migrating behavior:
   - plugin ID GUID in `CastCrewPlugin.Id`
-  - primary Cast&Crew navigation is the web-synced `menuLinks` entry; fallback `EnableInMainMenu` page exposure is only used when web-root sync fails.
+  - primary Cast&Crew navigation is the web-synced `menuLinks` entry.
   - top-banner/sidebar link is managed by `CastCrewWebConfigPatcher` via `config.json` `menuLinks` and points to `/web/#/home?tab=cast_crew`.
   - route rendering is handled by synchronized `Web/castcrew-top-banner-link.js` inside Jellyfin web.
   - standalone compatibility page content is sourced from embedded `Web/cast-crew-standalone.html`.
