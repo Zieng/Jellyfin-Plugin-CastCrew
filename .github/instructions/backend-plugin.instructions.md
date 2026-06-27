@@ -21,6 +21,11 @@ applyTo:
 - If adding hosted page files, update `.csproj` `EmbeddedResource` entries.
 - Preserve plugin identity constants (`Id`, key page names) unless explicitly migrating behavior.
 
+## Version and packaging
+
+- `JellyfinVersion` must be the **baseline** (minimum) version for each target series — never the latest patch.
+- When changing `JellyfinVersion` or `<Version>`, also update the manifest changelog in `.github/workflows/package-plugin.yml`.
+
 ## Validation
 
 - Build and run tests after backend changes.

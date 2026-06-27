@@ -29,26 +29,31 @@ jobs:
       - name: Restore plugin dependencies
         run: dotnet restore src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj
 
+      - name: Determine plugin version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Prefer git tag (strip leading 'v'); fall back to .csproj for non-tag runs
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+          else
+            version="$(sed -n '/<Version>/{s:.*<Version>\(.*\)</Version>.*:\1:p;q;}' src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj)"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "folder_10_10=CastCrew_${version}_jellyfin-10.10" >> "$GITHUB_OUTPUT"
+          echo "folder_10_11=CastCrew_${version}_jellyfin-10.11" >> "$GITHUB_OUTPUT"
+          echo "zip_10_10=CastCrew_${version}_jellyfin-10.10.zip" >> "$GITHUB_OUTPUT"
+          echo "zip_10_11=CastCrew_${version}_jellyfin-10.11.zip" >> "$GITHUB_OUTPUT"
+
       - name: Build plugin
-        run: dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --no-restore
+        run: dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.value }}
 
       - name: Run unit tests
         run: dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --configuration Release
 
       - name: Run integration test project (opt-in tests remain skipped by default)
         run: dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --configuration Release
-
-      - name: Read plugin version
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(sed -n '/<Version>/{s:.*<Version>\(.*\)</Version>.*:\1:p;q;}' src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj)"
-          echo "value=$version" >> "$GITHUB_OUTPUT"
-          echo "folder_10_10=CastCrew_${version}_jellyfin-10.10" >> "$GITHUB_OUTPUT"
-          echo "folder_10_11=CastCrew_${version}_jellyfin-10.11" >> "$GITHUB_OUTPUT"
-          echo "zip_10_10=CastCrew_${version}_jellyfin-10.10.zip" >> "$GITHUB_OUTPUT"
-          echo "zip_10_11=CastCrew_${version}_jellyfin-10.11.zip" >> "$GITHUB_OUTPUT"
 
       - name: Publish plugin assemblies
         shell: bash
@@ -107,10 +112,11 @@ jobs:
               "overview": "Browse actors, directors, and producers in a dedicated Cast & Crew page within Jellyfin Web.",
               "owner": "Zieng",
               "category": "General",
+              "imageUrl": "https://github.com/${{ github.repository }}/raw/main/docs/images/logo.png",
               "versions": [
                 {
                   "version": "${version}",
-                  "changelog": "Multi-version support for Jellyfin 10.11.x (net9.0).",
+                  "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.11.x servers.",
                   "targetAbi": "10.11.0.0",
                   "sourceUrl": "${repo_url}/${{ steps.version.outputs.zip_10_11 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_11 }}",
@@ -118,7 +124,7 @@ jobs:
                 },
                 {
                   "version": "${version}",
-                  "changelog": "Multi-version support for Jellyfin 10.10.x (net8.0).",
+                  "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.10.x servers.",
                   "targetAbi": "10.10.0.0",
                   "sourceUrl": "${repo_url}/${{ steps.version.outputs.zip_10_10 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_10 }}",

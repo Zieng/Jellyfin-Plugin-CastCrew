@@ -33,7 +33,7 @@ public sealed class CastCrewController : ControllerBase
     public ActionResult GetRepositoryManifest()
     {
         var plugin = CastCrewPlugin.Instance;
-        var version = plugin?.Version?.ToString() ?? "0.1.0.0";
+        var version = plugin?.Version?.ToString() ?? "unknown";
         var description = plugin?.Description ?? "Adds a Cast & Crew module to the Jellyfin sidebar for browsing actors, directors, producers, and other crew members.";
 
         var manifest = new[]
