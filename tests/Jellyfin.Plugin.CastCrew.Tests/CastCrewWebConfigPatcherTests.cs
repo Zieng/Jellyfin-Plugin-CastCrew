@@ -195,6 +195,44 @@ public sealed class CastCrewWebConfigPatcherTests
         }
     }
 
+    [Fact]
+    public void SyncCastCrewMenuLink_WhenLoggerIsNull_WritesWarningToConsoleError()
+    {
+        var missingWebRoot = Path.Combine(
+            Path.GetTempPath(),
+            "castcrew-missing-" + Guid.NewGuid().ToString("N"));
+
+        using var errorWriter = new StringWriter();
+        var originalError = Console.Error;
+
+        try
+        {
+            Console.SetError(errorWriter);
+
+            InvokeSyncCastCrewMenuLink(missingWebRoot, enabled: true);
+
+            var output = errorWriter.ToString();
+            Assert.Contains("Unable to sync menu link", output, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains(missingWebRoot, output, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Console.SetError(originalError);
+        }
+    }
+
+    [Fact]
+    public void SyncCastCrewMenuLink_MissingWebRoot_ReturnsFailureStatus()
+    {
+        var missingWebRoot = Path.Combine(
+            Path.GetTempPath(),
+            "castcrew-missing-status-" + Guid.NewGuid().ToString("N"));
+
+        var result = InvokeSyncCastCrewMenuLink(missingWebRoot, enabled: true);
+        Assert.NotNull(result);
+        Assert.Equal("Failed", result!.ToString());
+    }
+
     private static string CreateTemporaryWebRoot()
     {
         var path = Path.Combine(
@@ -251,13 +289,13 @@ public sealed class CastCrewWebConfigPatcherTests
         return value.GetValue<string>();
     }
 
-    private static void InvokeSyncCastCrewMenuLink(string webRoot, bool enabled)
+    private static object? InvokeSyncCastCrewMenuLink(string webRoot, bool enabled)
     {
         var assembly = typeof(CastCrewPlugin).Assembly;
         var type = assembly.GetType("Jellyfin.Plugin.CastCrew.CastCrewWebConfigPatcher", throwOnError: true);
         Assert.NotNull(type);
         var method = type!.GetMethod("SyncCastCrewMenuLink", BindingFlags.Public | BindingFlags.Static);
         Assert.NotNull(method);
-        method!.Invoke(null, new object?[] { webRoot, enabled, null });
+        return method!.Invoke(null, new object?[] { webRoot, enabled, null });
     }
 }

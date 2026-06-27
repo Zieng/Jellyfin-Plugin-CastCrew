@@ -48,11 +48,11 @@ Rationale:
 
 ### 5.1 Navigation
 
-1. Plugin does not expose Cast&Crew as a dashboard configuration page entry (`EnableInMainMenu = false`).
-2. Plugin synchronizes Jellyfin web `config.json` `menuLinks` to provide a `Cast&Crew` navigation link.
-3. Plugin synchronizes a helper script into Jellyfin web (`castcrew-top-banner-link.js`) to render CastCrew content inside the native home-shell content area.
-4. The Cast&Crew entry points to `/web/#/home?tab=cast_crew`.
-5. Plugin synchronizes `/web/cast-crew.html` as a compatibility redirect to the embedded home-shell route.
+1. Plugin synchronizes Jellyfin web `config.json` `menuLinks` to provide a `Cast&Crew` navigation link.
+2. Plugin synchronizes a helper script into Jellyfin web (`castcrew-top-banner-link.js`) to render CastCrew content inside the native home-shell content area.
+3. The primary Cast&Crew entry points to `/web/#/home?tab=cast_crew`.
+4. Plugin synchronizes `/web/cast-crew.html` as a compatibility redirect to the embedded home-shell route.
+5. When web-root sync fails (for example read-only installer web roots), plugin exposes a fallback `EnableInMainMenu` Cast&Crew page backed by embedded `Web/actors.html`.
 6. Menu icon target is person.
 
 ### 5.2 Cast & Crew Page Behavior
@@ -103,7 +103,7 @@ Rationale:
 
 1. Risk: Native person route shape varies by web build.
    - Mitigation: Centralize route fallback logic in cast & crew page.
-2. Risk: Menu placement and web root writeability vary across host builds (notably macOS app bundles under `/Applications`).
+2. Risk: Menu placement and web root writeability vary across host builds (notably Windows installer installs under `Program Files` and macOS app bundles under `/Applications`).
    - Mitigation: Keep adapter endpoint independent of web patching; use best-effort menu/script/page sync and document writable `--webdir` requirement for automatic navigation updates.
 3. Risk: Large person libraries may be expensive to load.
    - Mitigation: Paginated query and incremental loading.
@@ -132,7 +132,7 @@ Rationale:
 11. Added localization-ready string map and accessibility-focused page semantics.
 12. Added unit tests for query normalization logic.
 13. Added lightweight opt-in integration tests that exercise `/CastCrew/Actors` against a running Jellyfin host.
-14. Added web `config.json` sync for `Cast&Crew` navigation and disabled dashboard plugin-drawer exposure.
+14. Added web `config.json` sync for `Cast&Crew` navigation plus installer-safe fallback menu-page exposure when web-root sync fails.
 15. Added top-banner Cast&Crew-link/script synchronization through Jellyfin web `config.json` and `index.html` patching when host web assets are writable.
 16. Aligned actor retrieval with Jellyfin `Persons` query behavior to return populated results on 10.11.x.
 17. Embedded Cast&Crew content into Jellyfin home-shell route (`#/home?tab=cast_crew`) and kept `/web/cast-crew.html` as a compatibility redirect.

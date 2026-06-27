@@ -20,7 +20,7 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
         // Deferred sync: catch and log failures instead of crashing plugin load (issue #12)
         try
         {
-            CastCrewWebConfigPatcher.SyncCastCrewMenuLink(
+            _ = CastCrewWebConfigPatcher.SyncCastCrewMenuLink(
                 _applicationPaths.WebPath,
                 Configuration?.EnableCastCrewMainMenuEntry ?? true);
         }
@@ -40,7 +40,24 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
     {
         var prefix = GetType().Namespace;
         var configuration = Configuration ?? new PluginConfiguration();
-        CastCrewWebConfigPatcher.SyncCastCrewMenuLink(_applicationPaths.WebPath, configuration.EnableCastCrewMainMenuEntry);
+        var syncStatus = CastCrewWebConfigPatcher.SyncCastCrewMenuLink(_applicationPaths.WebPath, configuration.EnableCastCrewMainMenuEntry);
+
+        if (configuration.EnableCastCrewMainMenuEntry &&
+            syncStatus != CastCrewWebConfigSyncStatus.Succeeded)
+        {
+            // Installer-based Jellyfin hosts can have a read-only web root, which blocks
+            // config.json/index.html syncing. Expose a plugin-page fallback so CastCrew
+            // stays discoverable without writable web assets.
+            yield return new PluginPageInfo
+            {
+                Name = "castcrew-home",
+                DisplayName = "Cast&Crew",
+                EmbeddedResourcePath = $"{prefix}.Web.actors.html",
+                EnableInMainMenu = true,
+                MenuSection = "user",
+                MenuIcon = "person"
+            };
+        }
 
         yield return new PluginPageInfo
         {

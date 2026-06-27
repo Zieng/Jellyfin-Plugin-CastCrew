@@ -121,6 +121,7 @@ jobs:
           version="${{ steps.version.outputs.value }}"
           pages_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          changelog="Fix the issue that the plugin does not work on windows installer based jellyfin."
           cat > artifacts/manifest.json << EOF
           [
             {
@@ -134,7 +135,7 @@ jobs:
               "versions": [
                 {
                   "version": "${version}",
-                  "changelog": "Fix the checksum mismatch.",
+                  "changelog": "${changelog}",
                   "targetAbi": "10.11.0.0",
                   "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_11 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_11 }}",
@@ -142,7 +143,7 @@ jobs:
                 },
                 {
                   "version": "${version}",
-                  "changelog": "Fix the checksum mismatch.",
+                  "changelog": "${changelog}",
                   "targetAbi": "10.10.0.0",
                   "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_10 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_10 }}",

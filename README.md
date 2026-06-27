@@ -39,7 +39,7 @@ Jellyfin will automatically select the correct version for your server (10.10.x 
 ## Current Implementation
 
 - Server-side plugin scaffold in C# targeting Jellyfin `10.10.7` (net8.0) and `10.11.11` (net9.0) via multi-target build.
-- Plugin page registration only for admin configuration (no Cast&Crew entry in dashboard plugin drawer).
+- Plugin page registration includes admin configuration plus a conditional installer-safe fallback `Cast&Crew` main-menu page when web-root sync fails (for example on read-only web roots).
 - Automatic Jellyfin web `config.json` sync to add/remove a Cast&Crew navigation link.
 - Optional helper script (`castcrew-top-banner-link.js`) is synchronized into Jellyfin web to render CastCrew content inside the native home-shell route.
 - Cast&Crew navigation targets the embedded home route (`/web/#/home?tab=cast_crew`) so native Jellyfin sidebar/top-banner chrome stays intact.
@@ -85,12 +85,15 @@ Jellyfin will automatically select the correct version for your server (10.10.x 
   - `AvailableTags`, `AvailableProductionLocations`
   - optional grouped search payload: `NameMatchItems`, `NameMatchCount`, `DescriptionMatchItems`, `DescriptionMatchCount`
 
-## Host Notes (macOS app bundle)
+## Host Notes (read-only web roots)
 
-- Jellyfin macOS app installs often use a read-only web root under `/Applications/Jellyfin.app/.../jellyfin-web`.
-- In that mode, CastCrew cannot write `config.json`, inject `castcrew-top-banner-link.js`, or update `/web/cast-crew.html`.
+- Some installs use a read-only web root (for example `C:\Program Files\Jellyfin\Server\jellyfin-web` on Windows installer installs, or `/Applications/Jellyfin.app/.../jellyfin-web` on macOS app bundles).
+- In that mode, CastCrew cannot write `config.json`, inject `castcrew-top-banner-link.js`, or update `/web/cast-crew.html`, so the Cast&Crew sidebar/top-banner entry will not auto-sync.
+- When auto-sync fails, CastCrew exposes a fallback `Cast&Crew` plugin-page menu entry so browsing still works without writable web assets.
 - If you need automatic Cast&Crew-link/script syncing, run Jellyfin with a writable `--webdir` (for example, a copied web directory under your user data path).
-- Example startup override:
+- Example startup override (Windows):
+  - `jellyfin --webdir "%LOCALAPPDATA%\Jellyfin\custom-web" --datadir "%LOCALAPPDATA%\Jellyfin"`
+- Example startup override (macOS):
   - `jellyfin --webdir "$HOME/Library/Application Support/jellyfin/custom-web" --datadir "$HOME/Library/Application Support/jellyfin"`
 
 ## Client and Platform Limitations

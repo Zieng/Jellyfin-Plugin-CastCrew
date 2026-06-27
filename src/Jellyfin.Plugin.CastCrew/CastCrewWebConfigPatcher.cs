@@ -1,8 +1,16 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.CastCrew;
+
+internal enum CastCrewWebConfigSyncStatus
+{
+    Succeeded,
+    FailedNeedsWritableWebRoot,
+    Failed
+}
 
 internal static class CastCrewWebConfigPatcher
 {
@@ -18,25 +26,25 @@ internal static class CastCrewWebConfigPatcher
     private const string IndexFileName = "index.html";
     private const string TopBannerScriptTag = "<script src=\"castcrew-top-banner-link.js\" defer></script>";
 
-    public static void SyncCastCrewMenuLink(string? webPath, bool enabled, ILogger? logger = null)
+    public static CastCrewWebConfigSyncStatus SyncCastCrewMenuLink(string? webPath, bool enabled, ILogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(webPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath is empty.");
-            return;
+            return CastCrewWebConfigSyncStatus.Failed;
         }
 
         if (!Directory.Exists(webPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath '{0}' does not exist.", webPath);
-            return;
+            return CastCrewWebConfigSyncStatus.Failed;
         }
 
         var configPath = Path.Combine(webPath, ConfigFileName);
         if (!File.Exists(configPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: '{0}' was not found.", configPath);
-            return;
+            return CastCrewWebConfigSyncStatus.Failed;
         }
 
         try
@@ -46,7 +54,7 @@ internal static class CastCrewWebConfigPatcher
             if (root is null)
             {
                 Log(logger, LogLevel.Warning, "Unable to sync menu link: '{0}' is not a valid JSON object.", configPath);
-                return;
+                return CastCrewWebConfigSyncStatus.Failed;
             }
 
             var changed = false;
@@ -108,7 +116,7 @@ internal static class CastCrewWebConfigPatcher
 
             if (!changed)
             {
-                return;
+                return CastCrewWebConfigSyncStatus.Succeeded;
             }
 
             var jsonOptions = new JsonSerializerOptions
@@ -121,18 +129,22 @@ internal static class CastCrewWebConfigPatcher
                 root.ToJsonString(jsonOptions) + Environment.NewLine);
 
             Log(logger, LogLevel.Information, "Successfully synced Cast & Crew menu link (enabled={0}).", enabled);
+            return CastCrewWebConfigSyncStatus.Succeeded;
         }
         catch (IOException ex)
         {
             Log(logger, LogLevel.Error, "Unable to sync menu link: I/O failure writing to web root. {0}", ex.Message);
+            return CastCrewWebConfigSyncStatus.Failed;
         }
         catch (UnauthorizedAccessException ex)
         {
-            Log(logger, LogLevel.Error, "Unable to sync menu link: access denied to web root. On Windows, ensure Jellyfin has write access to the web directory. {0}", ex.Message);
+            Log(logger, LogLevel.Error, "Unable to sync menu link: access denied to web root. Installer-based web roots (for example Program Files) are often read-only; use a writable --webdir or grant Jellyfin write access. {0}", ex.Message);
+            return CastCrewWebConfigSyncStatus.FailedNeedsWritableWebRoot;
         }
         catch (JsonException ex)
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: invalid JSON in config. {0}", ex.Message);
+            return CastCrewWebConfigSyncStatus.Failed;
         }
     }
 
@@ -327,6 +339,16 @@ internal static class CastCrewWebConfigPatcher
         if (logger is not null)
         {
             logger.Log(level, "[CastCrew] " + message, args);
+            return;
+        }
+
+        if (args.Length > 0)
+        {
+            Console.Error.WriteLine("[CastCrew] " + string.Format(CultureInfo.InvariantCulture, message, args));
+        }
+        else
+        {
+            Console.Error.WriteLine("[CastCrew] " + message);
         }
     }
 }
