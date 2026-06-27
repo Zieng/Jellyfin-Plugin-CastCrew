@@ -6,22 +6,23 @@
     "overview": "Browse actors, directors, and producers in a dedicated Cast & Crew page within Jellyfin Web.",
     "owner": "Zieng",
     "category": "General",
+    "imageUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/raw/main/docs/images/logo.png",
     "versions": [
       {
         "version": "0.1.0.0",
-        "changelog": "Multi-version support for Jellyfin 10.11.x (net9.0).",
+        "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.11.x servers.",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/releases/download/v0.1.0.0/CastCrew_0.1.0.0_jellyfin-10.11.zip",
-        "checksum": "cfaf96241f4ab6ed8e1f5b2c87dd4d44",
-        "timestamp": "2026-06-27T09:15:04Z"
+        "checksum": "8b252fbc540d34d6365fd875d6bd3b48",
+        "timestamp": "2026-06-27T10:31:17Z"
       },
       {
         "version": "0.1.0.0",
-        "changelog": "Multi-version support for Jellyfin 10.10.x (net8.0).",
+        "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.10.x servers.",
         "targetAbi": "10.10.0.0",
         "sourceUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/releases/download/v0.1.0.0/CastCrew_0.1.0.0_jellyfin-10.10.zip",
-        "checksum": "40434b405161d929b053651067c7a5ae",
-        "timestamp": "2026-06-27T09:15:04Z"
+        "checksum": "0047dd788dbba83b0b5a64dba9ec7263",
+        "timestamp": "2026-06-27T10:31:17Z"
       }
     ]
   }
