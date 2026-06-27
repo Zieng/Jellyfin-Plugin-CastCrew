@@ -50,10 +50,10 @@ jobs:
         run: dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --no-restore -p:Version=${{ steps.version.outputs.value }}
 
       - name: Run unit tests
-        run: dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --configuration Release
+        run: dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --configuration Release -p:Version=${{ steps.version.outputs.value }}
 
       - name: Run integration test project (opt-in tests remain skipped by default)
-        run: dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --configuration Release
+        run: dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --configuration Release -p:Version=${{ steps.version.outputs.value }}
 
       - name: Publish plugin assemblies
         shell: bash
@@ -82,9 +82,27 @@ jobs:
 
       - name: Zip plugin artifacts
         working-directory: artifacts
+        shell: bash
         run: |
-          zip -r "${{ steps.version.outputs.zip_10_10 }}" "${{ steps.version.outputs.folder_10_10 }}"
-          zip -r "${{ steps.version.outputs.zip_10_11 }}" "${{ steps.version.outputs.folder_10_11 }}"
+          # Zip contents only (no parent directory) — Jellyfin expects DLLs at zip root
+          (cd "${{ steps.version.outputs.folder_10_10 }}" && zip -r "../${{ steps.version.outputs.zip_10_10 }}" .)
+          (cd "${{ steps.version.outputs.folder_10_11 }}" && zip -r "../${{ steps.version.outputs.zip_10_11 }}" .)
+
+      - name: Validate zip structure (DLL must be at root)
+        working-directory: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          for zip in "${{ steps.version.outputs.zip_10_10 }}" "${{ steps.version.outputs.zip_10_11 }}"; do
+            echo "Checking $zip..."
+            if ! unzip -l "$zip" | grep -q "Jellyfin.Plugin.CastCrew.dll$"; then
+              echo "ERROR: $zip does not contain Jellyfin.Plugin.CastCrew.dll" >&2; exit 1
+            fi
+            if unzip -l "$zip" | grep "Jellyfin.Plugin.CastCrew.dll$" | grep -q "/"; then
+              echo "ERROR: $zip has DLL in a subdirectory (must be at zip root)" >&2; exit 1
+            fi
+          done
+          echo "All zips have correct flat structure."
 
       - name: Compute checksums
         id: checksum
@@ -101,7 +119,7 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ steps.version.outputs.value }}"
-          repo_url="https://github.com/${{ github.repository }}/releases/download/v${version}"
+          pages_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           cat > artifacts/manifest.json << EOF
           [
@@ -116,17 +134,17 @@ jobs:
               "versions": [
                 {
                   "version": "${version}",
-                  "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.11.x servers.",
+                  "changelog": "Fix the checksum mismatch.",
                   "targetAbi": "10.11.0.0",
-                  "sourceUrl": "${repo_url}/${{ steps.version.outputs.zip_10_11 }}",
+                  "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_11 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_11 }}",
                   "timestamp": "${timestamp}"
                 },
                 {
                   "version": "${version}",
-                  "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.10.x servers.",
+                  "changelog": "Fix the checksum mismatch.",
                   "targetAbi": "10.10.0.0",
-                  "sourceUrl": "${repo_url}/${{ steps.version.outputs.zip_10_10 }}",
+                  "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_10 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_10 }}",
                   "timestamp": "${timestamp}"
                 }
@@ -136,6 +154,34 @@ jobs:
           EOF
           echo "Generated manifest.json:"
           cat artifacts/manifest.json
+
+      - name: Prepare Pages deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pages
+          cp artifacts/manifest.json pages/
+          cp "artifacts/${{ steps.version.outputs.zip_10_10 }}" pages/
+          cp "artifacts/${{ steps.version.outputs.zip_10_11 }}" pages/
+
+      - name: Validate manifest checksums match zip files
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Verifying manifest checksums against actual zip files..."
+          manifest_md5_10_11=$(python3 -c "import json; m=json.load(open('pages/manifest.json')); print([v['checksum'] for v in m[0]['versions'] if '10.11' in v['targetAbi']][0])")
+          manifest_md5_10_10=$(python3 -c "import json; m=json.load(open('pages/manifest.json')); print([v['checksum'] for v in m[0]['versions'] if '10.10' in v['targetAbi']][0])")
+          actual_md5_10_11=$(md5sum "pages/${{ steps.version.outputs.zip_10_11 }}" | awk '{print $1}')
+          actual_md5_10_10=$(md5sum "pages/${{ steps.version.outputs.zip_10_10 }}" | awk '{print $1}')
+          echo "  10.11 manifest=$manifest_md5_10_11 actual=$actual_md5_10_11"
+          echo "  10.10 manifest=$manifest_md5_10_10 actual=$actual_md5_10_10"
+          if [[ "$manifest_md5_10_11" != "$actual_md5_10_11" ]]; then
+            echo "ERROR: Checksum mismatch for 10.11 zip!" >&2; exit 1
+          fi
+          if [[ "$manifest_md5_10_10" != "$actual_md5_10_10" ]]; then
+            echo "ERROR: Checksum mismatch for 10.10 zip!" >&2; exit 1
+          fi
+          echo "All checksums verified successfully."
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -155,12 +201,11 @@ jobs:
             artifacts/${{ steps.version.outputs.zip_10_10 }}
             artifacts/${{ steps.version.outputs.zip_10_11 }}
 
-      - name: Deploy manifest to GitHub Pages
+      - name: Deploy manifest and packages to GitHub Pages
         if: startsWith(github.ref, 'refs/tags/')
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./artifacts
+          publish_dir: ./pages
           keep_files: false
           destination_dir: .
-          include_files: manifest.json

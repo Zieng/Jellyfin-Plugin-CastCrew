@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.CastCrew;
 
@@ -17,24 +18,24 @@ internal static class CastCrewWebConfigPatcher
     private const string IndexFileName = "index.html";
     private const string TopBannerScriptTag = "<script src=\"castcrew-top-banner-link.js\" defer></script>";
 
-    public static void SyncCastCrewMenuLink(string? webPath, bool enabled)
+    public static void SyncCastCrewMenuLink(string? webPath, bool enabled, ILogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(webPath))
         {
-            Console.Error.WriteLine("[CastCrew] Unable to sync top banner link: WebPath is empty.");
+            Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath is empty.");
             return;
         }
 
         if (!Directory.Exists(webPath))
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync top banner link: WebPath '{webPath}' does not exist.");
+            Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath '{0}' does not exist.", webPath);
             return;
         }
 
         var configPath = Path.Combine(webPath, ConfigFileName);
         if (!File.Exists(configPath))
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync top banner link: '{configPath}' was not found.");
+            Log(logger, LogLevel.Warning, "Unable to sync menu link: '{0}' was not found.", configPath);
             return;
         }
 
@@ -44,7 +45,7 @@ internal static class CastCrewWebConfigPatcher
             var root = JsonNode.Parse(configText) as JsonObject;
             if (root is null)
             {
-                Console.Error.WriteLine($"[CastCrew] Unable to sync top banner link: '{configPath}' is not a valid JSON object.");
+                Log(logger, LogLevel.Warning, "Unable to sync menu link: '{0}' is not a valid JSON object.", configPath);
                 return;
             }
 
@@ -60,19 +61,15 @@ internal static class CastCrewWebConfigPatcher
             var castCrewLinkUrl = BuildCastCrewPageUrl();
             if (enabled)
             {
-                if (!EnsureCastCrewStandalonePageFile(webPath))
-                {
-                    return;
-                }
+                // Attempt top-banner script injection but do NOT abort menu link
+                // updates when it fails — the sidebar link is independent.
+                var canSyncTopBannerScript =
+                    EnsureCastCrewStandalonePageFile(webPath, logger) &&
+                    EnsureTopBannerScriptFile(webPath, logger);
 
-                if (!EnsureTopBannerScriptFile(webPath))
+                if (canSyncTopBannerScript)
                 {
-                    return;
-                }
-
-                if (!SyncTopBannerScriptTag(webPath, enabled: true))
-                {
-                    return;
+                    SyncTopBannerScriptTag(webPath, enabled: true, logger);
                 }
 
                 var existingLink = FindCastCrewMenuLink(menuLinks, castCrewLinkUrl);
@@ -96,10 +93,7 @@ internal static class CastCrewWebConfigPatcher
             }
             else
             {
-                if (!SyncTopBannerScriptTag(webPath, enabled: false))
-                {
-                    return;
-                }
+                SyncTopBannerScriptTag(webPath, enabled: false, logger);
 
                 for (var index = menuLinks.Count - 1; index >= 0; index--)
                 {
@@ -125,43 +119,48 @@ internal static class CastCrewWebConfigPatcher
             File.WriteAllText(
                 configPath,
                 root.ToJsonString(jsonOptions) + Environment.NewLine);
+
+            Log(logger, LogLevel.Information, "Successfully synced Cast & Crew menu link (enabled={0}).", enabled);
         }
         catch (IOException ex)
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync top banner link: I/O failure. {ex.Message}");
+            Log(logger, LogLevel.Error, "Unable to sync menu link: I/O failure writing to web root. {0}", ex.Message);
         }
         catch (UnauthorizedAccessException ex)
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync top banner link: access denied. {ex.Message}");
+            Log(logger, LogLevel.Error, "Unable to sync menu link: access denied to web root. On Windows, ensure Jellyfin has write access to the web directory. {0}", ex.Message);
         }
         catch (JsonException ex)
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync top banner link: invalid JSON. {ex.Message}");
+            Log(logger, LogLevel.Warning, "Unable to sync menu link: invalid JSON in config. {0}", ex.Message);
         }
     }
 
     private static string BuildCastCrewPageUrl()
         => CastCrewHomeTabRoute;
 
-    private static bool EnsureCastCrewStandalonePageFile(string webPath)
+    private static bool EnsureCastCrewStandalonePageFile(string webPath, ILogger? logger)
         => EnsureEmbeddedAssetFile(
             webPath,
             CastCrewStandaloneFileName,
             CastCrewStandaloneResourceName,
-            "standalone cast & crew page");
+            "standalone cast & crew page",
+            logger);
 
-    private static bool EnsureTopBannerScriptFile(string webPath)
+    private static bool EnsureTopBannerScriptFile(string webPath, ILogger? logger)
         => EnsureEmbeddedAssetFile(
             webPath,
             TopBannerScriptFileName,
             TopBannerScriptResourceName,
-            "top-banner cast & crew route script");
+            "top-banner cast & crew route script",
+            logger);
 
     private static bool EnsureEmbeddedAssetFile(
         string webPath,
         string outputFileName,
         string resourceName,
-        string assetDescription)
+        string assetDescription,
+        ILogger? logger)
     {
         var outputPath = Path.Combine(webPath, outputFileName);
         using var resourceStream = typeof(CastCrewWebConfigPatcher).Assembly
@@ -169,7 +168,7 @@ internal static class CastCrewWebConfigPatcher
 
         if (resourceStream is null)
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync {assetDescription}: embedded resource '{resourceName}' was not found.");
+            Log(logger, LogLevel.Warning, "Unable to sync {0}: embedded resource '{1}' was not found.", assetDescription, resourceName);
             return false;
         }
 
@@ -185,16 +184,30 @@ internal static class CastCrewWebConfigPatcher
             }
         }
 
-        File.WriteAllText(outputPath, outputContent);
+        try
+        {
+            File.WriteAllText(outputPath, outputContent);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            Log(logger, LogLevel.Error, "Unable to write {0} to '{1}': access denied. {2}", assetDescription, outputPath, ex.Message);
+            return false;
+        }
+        catch (IOException ex)
+        {
+            Log(logger, LogLevel.Error, "Unable to write {0} to '{1}': I/O error. {2}", assetDescription, outputPath, ex.Message);
+            return false;
+        }
+
         return true;
     }
 
-    private static bool SyncTopBannerScriptTag(string webPath, bool enabled)
+    private static bool SyncTopBannerScriptTag(string webPath, bool enabled, ILogger? logger)
     {
         var indexPath = Path.Combine(webPath, IndexFileName);
         if (!File.Exists(indexPath))
         {
-            Console.Error.WriteLine($"[CastCrew] Unable to sync top-banner script tag: '{indexPath}' was not found.");
+            Log(logger, LogLevel.Warning, "Unable to sync top-banner script tag: '{0}' was not found.", indexPath);
             return false;
         }
 
@@ -220,7 +233,7 @@ internal static class CastCrewWebConfigPatcher
 
             if (insertionIndex < 0)
             {
-                Console.Error.WriteLine($"[CastCrew] Unable to sync top-banner script tag: '{indexPath}' has no </head> or </body> marker.");
+                Log(logger, LogLevel.Warning, "Unable to sync top-banner script tag: '{0}' has no </head> or </body> marker.", indexPath);
                 return false;
             }
 
@@ -239,7 +252,20 @@ internal static class CastCrewWebConfigPatcher
 
         if (!string.Equals(indexContent, updatedContent, StringComparison.Ordinal))
         {
-            File.WriteAllText(indexPath, updatedContent);
+            try
+            {
+                File.WriteAllText(indexPath, updatedContent);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Log(logger, LogLevel.Error, "Unable to modify '{0}': access denied. {1}", indexPath, ex.Message);
+                return false;
+            }
+            catch (IOException ex)
+            {
+                Log(logger, LogLevel.Error, "Unable to modify '{0}': I/O error. {1}", indexPath, ex.Message);
+                return false;
+            }
         }
 
         return true;
@@ -294,5 +320,13 @@ internal static class CastCrewWebConfigPatcher
 
         link[key] = value;
         return true;
+    }
+
+    private static void Log(ILogger? logger, LogLevel level, string message, params object[] args)
+    {
+        if (logger is not null)
+        {
+            logger.Log(level, "[CastCrew] " + message, args);
+        }
     }
 }

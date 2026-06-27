@@ -165,6 +165,36 @@ public sealed class CastCrewWebConfigPatcherTests
         }
     }
 
+    [Fact]
+    public void SyncCastCrewMenuLink_Enabled_StillAddsMenuLink_WhenIndexHtmlIsMissing()
+    {
+        var webRoot = CreateTemporaryWebRoot();
+        try
+        {
+            var configPath = Path.Combine(webRoot, "config.json");
+            File.WriteAllText(
+                configPath,
+                """
+                {
+                  "menuLinks": []
+                }
+                """);
+
+            // Intentionally no index.html to reproduce script-tag sync failure.
+            InvokeSyncCastCrewMenuLink(webRoot, enabled: true);
+
+            var menuLinks = ReadMenuLinks(configPath);
+            var castCrewLink = FindCastCrewLink(menuLinks);
+            Assert.NotNull(castCrewLink);
+            Assert.Equal(CastCrewLinkName, ReadString(castCrewLink!, "name"));
+            Assert.Equal(CastCrewHomeTabUrl, ReadString(castCrewLink!, "url"));
+        }
+        finally
+        {
+            Directory.Delete(webRoot, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryWebRoot()
     {
         var path = Path.Combine(
@@ -228,6 +258,6 @@ public sealed class CastCrewWebConfigPatcherTests
         Assert.NotNull(type);
         var method = type!.GetMethod("SyncCastCrewMenuLink", BindingFlags.Public | BindingFlags.Static);
         Assert.NotNull(method);
-        method!.Invoke(null, new object?[] { webRoot, enabled });
+        method!.Invoke(null, new object?[] { webRoot, enabled, null });
     }
 }
