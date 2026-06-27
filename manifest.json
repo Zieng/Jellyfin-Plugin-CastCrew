@@ -9,20 +9,20 @@
     "imageUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/raw/main/docs/images/logo.png",
     "versions": [
       {
-        "version": "0.1.0.0",
+        "version": "0.1.0.1",
         "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.11.x servers.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/releases/download/v0.1.0.0/CastCrew_0.1.0.0_jellyfin-10.11.zip",
-        "checksum": "8b252fbc540d34d6365fd875d6bd3b48",
-        "timestamp": "2026-06-27T10:31:17Z"
+        "sourceUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/releases/download/v0.1.0.1/CastCrew_0.1.0.1_jellyfin-10.11.zip",
+        "checksum": "f8ae66bf9eb4a28c1580e4dab4192043",
+        "timestamp": "2026-06-27T10:47:42Z"
       },
       {
-        "version": "0.1.0.0",
+        "version": "0.1.0.1",
         "changelog": "Fix assembly version compatibility: compile against baseline SDK for all 10.10.x servers.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/releases/download/v0.1.0.0/CastCrew_0.1.0.0_jellyfin-10.10.zip",
-        "checksum": "0047dd788dbba83b0b5a64dba9ec7263",
-        "timestamp": "2026-06-27T10:31:17Z"
+        "sourceUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/releases/download/v0.1.0.1/CastCrew_0.1.0.1_jellyfin-10.10.zip",
+        "checksum": "3bcd69e89c3bd0a63cc27749d99037c0",
+        "timestamp": "2026-06-27T10:47:42Z"
       }
     ]
   }
