@@ -11,10 +11,17 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
     public static CastCrewPlugin? Instance { get; private set; }
     private readonly IApplicationPaths _applicationPaths;
 
-    public CastCrewPlugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer)
+    public CastCrewPlugin(IApplicationPaths applicationPaths, IXmlSerializer xmlSerializer, IPluginManager? pluginManager = null)
         : base(applicationPaths, xmlSerializer)
     {
         _applicationPaths = applicationPaths;
+        _ = CastCrewPluginManifestCompatibility.TryApplyReadOnlyManifestStartupWorkaround(
+            pluginManager,
+            Id,
+            AssemblyFilePath,
+            Version,
+            null,
+            static message => Console.Error.WriteLine("[CastCrew] " + message));
         Instance = this;
     }
 
