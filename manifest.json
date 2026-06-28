@@ -9,20 +9,20 @@
     "imageUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/raw/main/docs/images/logo.png",
     "versions": [
       {
-        "version": "0.1.0.7",
-        "changelog": "Try to fix the docker based jellyfin not working issue.",
+        "version": "0.1.0.8",
+        "changelog": "Add person-library filtering, improve Cast & Crew settings UX, and add optional debug mapping logs.",
         "targetAbi": "10.11.0.0",
-        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.7_jellyfin-10.11.zip",
-        "checksum": "23833f61ab790e0f00009742694d045e",
-        "timestamp": "2026-06-28T02:36:33Z"
+        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.8_jellyfin-10.11.zip",
+        "checksum": "09636957fb5c41dde5be7e5024e1092b",
+        "timestamp": "2026-06-28T09:05:49Z"
       },
       {
-        "version": "0.1.0.7",
-        "changelog": "Try to fix the docker based jellyfin not working issue.",
+        "version": "0.1.0.8",
+        "changelog": "Add person-library filtering, improve Cast & Crew settings UX, and add optional debug mapping logs.",
         "targetAbi": "10.10.0.0",
-        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.7_jellyfin-10.10.zip",
-        "checksum": "012fbf54349168520772e1dc9f2a4d7c",
-        "timestamp": "2026-06-28T02:36:33Z"
+        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.8_jellyfin-10.10.zip",
+        "checksum": "778bbf3fafbdccc3ded0ae3de316c92c",
+        "timestamp": "2026-06-28T09:05:49Z"
       }
     ]
   }
