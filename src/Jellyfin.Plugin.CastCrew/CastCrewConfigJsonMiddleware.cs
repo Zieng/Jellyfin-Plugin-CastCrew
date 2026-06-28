@@ -105,9 +105,12 @@ internal sealed class CastCrewConfigJsonMiddleware
                 });
             }
 
-            // Serve the modified config.json
+            // Serve the modified config.json with no-cache to prevent browser disk cache
+            // from serving stale responses (the Jellyfin client also requests with cache: no-store)
             var modifiedJson = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
             context.Response.ContentType = "application/json";
+            context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+            context.Response.Headers.Pragma = "no-cache";
             context.Response.StatusCode = 200;
             await context.Response.WriteAsync(modifiedJson);
         }
