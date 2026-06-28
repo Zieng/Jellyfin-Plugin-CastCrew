@@ -9,6 +9,22 @@
     "imageUrl": "https://github.com/Zieng/Jellyfin-Plugin-CastCrew/raw/main/docs/images/logo.png",
     "versions": [
       {
+        "version": "0.1.0.10",
+        "changelog": "Target ABI 10.11.x: Preserve release history in manifest deployment so previous versions remain visible in Jellyfin catalog.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.10_jellyfin-10.11.zip",
+        "checksum": "7bdb4dd08154c6203d881aa6099a36b8",
+        "timestamp": "2026-06-28T14:08:26Z"
+      },
+      {
+        "version": "0.1.0.10",
+        "changelog": "Target ABI 10.10.x: Preserve release history in manifest deployment so previous versions remain visible in Jellyfin catalog.",
+        "targetAbi": "10.10.0.0",
+        "sourceUrl": "https://Zieng.github.io/Jellyfin-Plugin-CastCrew/CastCrew_0.1.0.10_jellyfin-10.10.zip",
+        "checksum": "4fe9da274dae0f45f90cb4de30e52aec",
+        "timestamp": "2026-06-28T14:08:26Z"
+      },
+      {
         "version": "0.1.0.9",
         "changelog": "Target ABI 10.11.x: Add person-library filtering, improve Cast & Crew settings UX, and add optional debug mapping logs.",
         "targetAbi": "10.11.0.0",
