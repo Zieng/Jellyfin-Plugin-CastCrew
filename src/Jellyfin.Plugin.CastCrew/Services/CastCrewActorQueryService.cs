@@ -12,11 +12,13 @@ public sealed class CastCrewActorQueryService
 {
     private readonly ILibraryManager _libraryManager;
     private readonly IDtoService _dtoService;
+    private readonly CastCrewLibraryPersonMappingService _mappingService;
 
-    public CastCrewActorQueryService(ILibraryManager libraryManager, IDtoService dtoService)
+    public CastCrewActorQueryService(ILibraryManager libraryManager, IDtoService dtoService, CastCrewLibraryPersonMappingService mappingService)
     {
         _libraryManager = libraryManager;
         _dtoService = dtoService;
+        _mappingService = mappingService;
     }
 
 #if JELLYFIN_10_11
@@ -60,7 +62,7 @@ public sealed class CastCrewActorQueryService
         // When a search term is present, return grouped results (name matches + description matches)
         if (!string.IsNullOrEmpty(normalizedQuery.SearchTerm))
         {
-            return QueryPersonsGrouped(normalizedQuery, user, personType, dtoOptions);
+            return QueryPersonsGrouped(normalizedQuery, user, personType, dtoOptions, configuration);
         }
 
         // No search term: return flat list with pagination (existing behavior)
@@ -94,12 +96,16 @@ public sealed class CastCrewActorQueryService
             };
         }
 
-        var availableTags = GetAvailableFacetValues(allPersons, person => person.Tags);
+        // Apply library filter
+        var includedLibraryIds = configuration.IncludedLibraryIds;
+        var libraryFilteredPersons = ApplyLibraryFilter(allPersons, includedLibraryIds);
+
+        var availableTags = GetAvailableFacetValues(libraryFilteredPersons, person => person.Tags);
         var availableProductionLocations = GetAvailableFacetValues(
-            allPersons,
+            libraryFilteredPersons,
             person => person.ProductionLocations,
             NormalizeProductionLocationFacetValue);
-        var filteredPersons = ApplyFacetFilters(allPersons, normalizedQuery).ToArray();
+        var filteredPersons = ApplyFacetFilters(libraryFilteredPersons, normalizedQuery).ToArray();
         var orderedPersons = ApplySorting(filteredPersons, normalizedQuery);
 
         var pagedPersons = orderedPersons
@@ -132,7 +138,8 @@ public sealed class CastCrewActorQueryService
         Jellyfin.Data.Entities.User user,
 #endif
         string personType,
-        DtoOptions dtoOptions)
+        DtoOptions dtoOptions,
+        PluginConfiguration configuration)
     {
         IReadOnlyList<Person> nameMatchPersons;
         IReadOnlyList<Person> allPersons;
@@ -180,6 +187,11 @@ public sealed class CastCrewActorQueryService
                 AvailableProductionLocations = Array.Empty<string>()
             };
         }
+
+        // Apply library filter
+        var includedLibraryIds = configuration.IncludedLibraryIds;
+        nameMatchPersons = ApplyLibraryFilter(nameMatchPersons, includedLibraryIds);
+        allPersons = ApplyLibraryFilter(allPersons, includedLibraryIds);
 
         var availableTags = GetAvailableFacetValues(allPersons, person => person.Tags);
         var availableProductionLocations = GetAvailableFacetValues(
@@ -234,6 +246,18 @@ public sealed class CastCrewActorQueryService
             AvailableTags = availableTags,
             AvailableProductionLocations = availableProductionLocations
         };
+    }
+
+    private IReadOnlyList<Person> ApplyLibraryFilter(IReadOnlyList<Person> persons, string[] includedLibraryIds)
+    {
+        if (includedLibraryIds is null || includedLibraryIds.Length == 0)
+        {
+            return persons;
+        }
+
+        return persons
+            .Where(person => _mappingService.IsPersonInLibraries(person.Name, includedLibraryIds))
+            .ToList();
     }
 
     private static IEnumerable<Person> ApplyFacetFilters(

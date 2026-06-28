@@ -11,6 +11,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         serviceCollection.AddSingleton<CastCrewActorQueryService>();
+        serviceCollection.AddSingleton<CastCrewLibraryPersonMappingService>();
         serviceCollection.AddHostedService<CastCrewStartupSyncHostedService>();
         serviceCollection.AddTransient<IStartupFilter, CastCrewStartupFilter>();
     }

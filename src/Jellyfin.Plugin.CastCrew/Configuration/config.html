@@ -46,6 +46,18 @@
                 <div class="fieldDescription">Controls fallback navigation for person detail pages across different jellyfin-web builds.</div>
             </div>
 
+            <div class="verticalSection">
+                <h3 class="sectionTitle">Media Library Filter</h3>
+                <div class="fieldDescription" style="margin-bottom: 1em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
+                <div id="libraryCheckboxContainer" class="checkboxList">
+                    <div class="loading" style="padding: 0.5em;">Loading libraries...</div>
+                </div>
+                <button is="emby-button" id="refreshMappingButton" type="button" class="raised button-cancel" style="margin-top: 0.5em;">
+                    <span>Refresh Person-Library Mapping</span>
+                </button>
+                <div class="fieldDescription">After changing library selections and saving, click this button to rebuild the person-to-library index. This is also done automatically on server restart.</div>
+            </div>
+
             <button is="emby-button" id="saveConfigButton" type="submit" class="raised button-submit block">
                 <span>Save</span>
             </button>
@@ -73,8 +85,12 @@
                 defaultPageSize: document.getElementById('defaultPageSize'),
                 defaultSortBy: document.getElementById('defaultSortBy'),
                 enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
-                detailRoutePreference: document.getElementById('detailRoutePreference')
+                detailRoutePreference: document.getElementById('detailRoutePreference'),
+                libraryCheckboxContainer: document.getElementById('libraryCheckboxContainer'),
+                refreshMappingButton: document.getElementById('refreshMappingButton')
             };
+
+            var availableLibraries = [];
 
             function normalizePageSize(value) {
                 var parsed = parseInt(value, 10);
@@ -97,17 +113,142 @@
                 return 'Auto';
             }
 
+            function escapeHtml(str) {
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(str || ''));
+                return div.innerHTML;
+            }
+
+            function renderLibraryCheckboxes(libraries, selectedIds) {
+                var container = refs.libraryCheckboxContainer;
+                if (!libraries || libraries.length === 0) {
+                    container.innerHTML = '<div class="fieldDescription">No media libraries found.</div>';
+                    return;
+                }
+
+                var selectedSet = {};
+                if (selectedIds && selectedIds.length > 0) {
+                    for (var i = 0; i < selectedIds.length; i++) {
+                        selectedSet[selectedIds[i]] = true;
+                    }
+                }
+
+                var html = '';
+                for (var j = 0; j < libraries.length; j++) {
+                    var lib = libraries[j];
+                    var checked = selectedSet[lib.Id] ? ' checked' : '';
+                    var typeLabel = lib.CollectionType ? ' (' + escapeHtml(lib.CollectionType) + ')' : '';
+                    html += '<div class="checkboxContainer checkboxContainer-withDescription">';
+                    html += '<label>';
+                    html += '<input is="emby-checkbox" type="checkbox" class="libraryCheckbox" data-library-id="' + escapeHtml(lib.Id) + '"' + checked + ' />';
+                    html += '<span>' + escapeHtml(lib.Name) + typeLabel + '</span>';
+                    html += '</label>';
+                    html += '</div>';
+                }
+                container.innerHTML = html;
+            }
+
+            function getSelectedLibraryIds() {
+                var checkboxes = refs.libraryCheckboxContainer.querySelectorAll('.libraryCheckbox');
+                var ids = [];
+                for (var i = 0; i < checkboxes.length; i++) {
+                    if (checkboxes[i].checked) {
+                        ids.push(checkboxes[i].getAttribute('data-library-id'));
+                    }
+                }
+                return ids;
+            }
+
+            function fetchLibraries() {
+                var headers = {};
+                if (window.ApiClient && window.ApiClient.getRequestHeaders) {
+                    var reqHeaders = window.ApiClient.getRequestHeaders();
+                    if (reqHeaders) {
+                        for (var key in reqHeaders) {
+                            if (Object.prototype.hasOwnProperty.call(reqHeaders, key)) {
+                                headers[key] = reqHeaders[key];
+                            }
+                        }
+                    }
+                }
+
+                var url = window.ApiClient
+                    ? window.ApiClient.getUrl('CastCrew/Libraries')
+                    : '/CastCrew/Libraries';
+
+                return fetch(url, { headers: headers })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to fetch libraries: ' + response.status);
+                        }
+                        return response.json();
+                    })
+                    .then(function (libraries) {
+                        availableLibraries = libraries || [];
+                        return availableLibraries;
+                    })
+                    .catch(function (error) {
+                        console.error('[CastCrew]', error);
+                        availableLibraries = [];
+                        return availableLibraries;
+                    });
+            }
+
+            function refreshMapping() {
+                var headers = {};
+                if (window.ApiClient && window.ApiClient.getRequestHeaders) {
+                    var reqHeaders = window.ApiClient.getRequestHeaders();
+                    if (reqHeaders) {
+                        for (var key in reqHeaders) {
+                            if (Object.prototype.hasOwnProperty.call(reqHeaders, key)) {
+                                headers[key] = reqHeaders[key];
+                            }
+                        }
+                    }
+                }
+
+                var url = window.ApiClient
+                    ? window.ApiClient.getUrl('CastCrew/Libraries/RefreshMapping')
+                    : '/CastCrew/Libraries/RefreshMapping';
+
+                Dashboard.showLoadingMsg();
+                return fetch(url, { method: 'POST', headers: headers })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Failed to refresh mapping: ' + response.status);
+                        }
+                        Dashboard.alert({
+                            title: 'CastCrew',
+                            message: 'Person-library mapping has been refreshed successfully.'
+                        });
+                    })
+                    .catch(function (error) {
+                        console.error('[CastCrew]', error);
+                        Dashboard.alert({
+                            title: 'CastCrew',
+                            message: 'Failed to refresh person-library mapping.'
+                        });
+                    })
+                    .finally(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+            }
+
             function applyConfig(config) {
                 refs.defaultPageSize.value = normalizePageSize(config.DefaultPageSize);
                 refs.defaultSortBy.value = normalizeSortBy(config.DefaultSortBy);
                 refs.enableCastCrewMainMenuEntry.checked = config.EnableCastCrewMainMenuEntry !== false;
                 refs.detailRoutePreference.value = normalizeRoutePreference(config.DetailRoutePreference);
+                renderLibraryCheckboxes(availableLibraries, config.IncludedLibraryIds || []);
             }
 
             function loadConfig() {
                 Dashboard.showLoadingMsg();
 
-                return window.ApiClient.getPluginConfiguration(pluginId)
+                return fetchLibraries()
+                    .then(function () {
+                        return window.ApiClient.getPluginConfiguration(pluginId);
+                    })
                     .then(function (config) {
                         applyConfig(config || {});
                     })
@@ -130,6 +271,7 @@
                         config.DefaultSortBy = normalizeSortBy(refs.defaultSortBy.value);
                         config.EnableCastCrewMainMenuEntry = refs.enableCastCrewMainMenuEntry.checked;
                         config.DetailRoutePreference = normalizeRoutePreference(refs.detailRoutePreference.value);
+                        config.IncludedLibraryIds = getSelectedLibraryIds();
 
                         refs.defaultPageSize.value = config.DefaultPageSize;
                         refs.defaultSortBy.value = config.DefaultSortBy;
@@ -153,6 +295,7 @@
             }
 
             refs.form.addEventListener('submit', saveConfig);
+            refs.refreshMappingButton.addEventListener('click', refreshMapping);
 
             configPage.addEventListener('pageshow', function () {
                 loadConfig();

@@ -54,7 +54,7 @@ public sealed class CastCrewPluginPageRegistrationTests
             File.WriteAllText(configPath, "{ \"menuLinks\": [] }");
             File.WriteAllText(indexPath, "<html><head></head><body></body></html>");
 
-            var service = new CastCrewStartupSyncHostedService(paths, NullLogger<CastCrewStartupSyncHostedService>.Instance);
+            var service = new CastCrewStartupSyncHostedService(paths, null!, NullLogger<CastCrewStartupSyncHostedService>.Instance);
             await service.StartAsync(CancellationToken.None);
 
             var rootJson = JsonNode.Parse(File.ReadAllText(configPath)) as JsonObject;

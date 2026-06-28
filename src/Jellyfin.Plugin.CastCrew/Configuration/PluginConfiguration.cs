@@ -11,6 +11,12 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EnableCastCrewMainMenuEntry { get; set; } = true;
 
     public string DetailRoutePreference { get; set; } = CastCrewConfigurationDefaults.RoutePreferenceAuto;
+
+    /// <summary>
+    /// Gets or sets the list of media library IDs to include when querying cast and crew.
+    /// An empty array means all libraries are included (default behavior).
+    /// </summary>
+    public string[] IncludedLibraryIds { get; set; } = Array.Empty<string>();
 }
 
 public static class CastCrewConfigurationDefaults

@@ -15,11 +15,13 @@ public sealed class CastCrewController : ControllerBase
 {
     private readonly IUserManager _userManager;
     private readonly CastCrewActorQueryService _actorQueryService;
+    private readonly CastCrewLibraryPersonMappingService _mappingService;
 
-    public CastCrewController(IUserManager userManager, CastCrewActorQueryService actorQueryService)
+    public CastCrewController(IUserManager userManager, CastCrewActorQueryService actorQueryService, CastCrewLibraryPersonMappingService mappingService)
     {
         _userManager = userManager;
         _actorQueryService = actorQueryService;
+        _mappingService = mappingService;
     }
 
     /// <summary>
@@ -62,6 +64,35 @@ public sealed class CastCrewController : ControllerBase
         };
 
         return Ok(manifest);
+    }
+
+    /// <summary>
+    /// Returns the list of available media libraries that can be used for filtering.
+    /// </summary>
+    [HttpGet("Libraries")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public ActionResult GetLibraries()
+    {
+        var libraries = _mappingService.GetAvailableLibraries();
+        var result = new List<object>();
+        foreach (var lib in libraries)
+        {
+            result.Add(new { lib.Id, lib.Name, lib.CollectionType });
+        }
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Triggers a rebuild of the person-to-library mapping.
+    /// </summary>
+    [HttpPost("Libraries/RefreshMapping")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public ActionResult RefreshLibraryMapping()
+    {
+        _mappingService.RebuildMapping();
+        return NoContent();
     }
 
     [HttpGet("Actors")]
