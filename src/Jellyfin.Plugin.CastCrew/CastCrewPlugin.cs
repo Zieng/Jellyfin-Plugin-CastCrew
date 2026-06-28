@@ -35,7 +35,11 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
     {
         var prefix = GetType().Namespace;
         var configuration = Configuration ?? new PluginConfiguration();
-        var syncStatus = CastCrewWebConfigPatcher.SyncCastCrewMenuLink(_applicationPaths.WebPath, configuration.EnableCastCrewMainMenuEntry);
+
+        // Attempt to sync menu link to web root (works when web root is writable).
+        // When read-only (Docker, installer-based), the CastCrewConfigJsonMiddleware
+        // handles menu link injection at the HTTP response level instead.
+        _ = CastCrewWebConfigPatcher.SyncCastCrewMenuLink(_applicationPaths.WebPath, configuration.EnableCastCrewMainMenuEntry);
 
         yield return new PluginPageInfo
         {
@@ -43,21 +47,5 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
             DisplayName = "CastCrew",
             EmbeddedResourcePath = $"{prefix}.Configuration.config.html"
         };
-
-        // When web-root sync fails (Docker, installer-based, or other read-only
-        // web roots), expose Cast&Crew as a main-menu plugin page so users can
-        // still discover and access the Cast & Crew UI.
-        if (syncStatus != CastCrewWebConfigSyncStatus.Succeeded &&
-            configuration.EnableCastCrewMainMenuEntry)
-        {
-            yield return new PluginPageInfo
-            {
-                Name = "castcrew-home",
-                DisplayName = "Cast & Crew",
-                EmbeddedResourcePath = $"{prefix}.Web.actors.html",
-                EnableInMainMenu = true,
-                MenuIcon = "person"
-            };
-        }
     }
 }
