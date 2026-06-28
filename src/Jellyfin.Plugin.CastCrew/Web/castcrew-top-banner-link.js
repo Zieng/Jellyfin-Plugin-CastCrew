@@ -444,6 +444,8 @@
         style.id = castCrewStylesId;
         style.textContent = [
             '.cast_crew-host { padding: 0 1.25em 1.25em; }',
+            '.castcrew-title-row { display: flex; align-items: center; justify-content: space-between; gap: .6em; }',
+            '.castcrew-title-row .sectionTitle { margin: 0; }',
             '.castcrew-tabs { display: flex; gap: 0; margin-bottom: 1em; border-bottom: 1px solid rgba(255,255,255,.15); }',
             '.castcrew-tab { background: none; border: none; border-bottom: 2px solid transparent; color: rgba(255,255,255,.6); padding: .6em 1.2em; cursor: pointer; font-size: .95em; transition: color .2s, border-color .2s; }',
             '.castcrew-tab:hover { color: rgba(255,255,255,.9); }',
@@ -495,8 +497,11 @@
         host.className = 'sections homeSectionsContainer cast_crew-host';
         host.style.display = 'none';
         host.innerHTML = '' +
-            '<div class=\"sectionTitleContainer\">' +
+            '<div class=\"sectionTitleContainer castcrew-title-row\">' +
                 '<h2 class=\"sectionTitle\">Cast &amp; Crew</h2>' +
+                '<button id=\"castcrewSettingsButton\" class=\"castcrew-icon-button\" type=\"button\" title=\"CastCrew settings\" aria-label=\"CastCrew settings\">' +
+                    '<span class=\"material-icons\">settings</span>' +
+                '</button>' +
             '</div>' +
             '<div class=\"castcrew-tabs\" role=\"tablist\">' +
                 '<button class=\"castcrew-tab castcrew-tab-active\" type=\"button\" role=\"tab\" data-tab=\"Actors\" aria-selected=\"true\">Actors</button>' +
@@ -587,6 +592,7 @@
             searchInput: host.querySelector('#castcrewSearchInput'),
             sortSelect: host.querySelector('#castcrewSortSelect'),
             searchButton: host.querySelector('#castcrewSearchButton'),
+            settingsButton: host.querySelector('#castcrewSettingsButton'),
             countIndicator: host.querySelector('#castcrewCountIndicator'),
             viewToggle: host.querySelector('#castcrewViewToggle'),
             filterButton: host.querySelector('#castcrewFilterButton'),
@@ -628,6 +634,7 @@
         });
 
         refs.searchButton.addEventListener('click', runSearch);
+        refs.settingsButton.addEventListener('click', openCastCrewSettings);
         refs.searchInput.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 runSearch();
@@ -947,6 +954,30 @@
         }
 
         window.location.href = '/web/index.html' + preferredRoute;
+    }
+
+    function buildSettingsRoute() {
+        var hash = window.location && typeof window.location.hash === 'string'
+            ? window.location.hash
+            : '';
+        var prefix = hash.indexOf('#/') === 0 ? '#/' : '#!/';
+        return prefix + 'configurationpage?name=castcrew-config';
+    }
+
+    function openCastCrewSettings() {
+        var route = buildSettingsRoute();
+
+        if (window.Dashboard && typeof window.Dashboard.navigate === 'function') {
+            window.Dashboard.navigate(route);
+            return;
+        }
+
+        if (window.location && typeof window.location.hash === 'string') {
+            window.location.hash = route;
+            return;
+        }
+
+        window.location.href = '/web/index.html' + route;
     }
 
     function renderCardHtml(person) {

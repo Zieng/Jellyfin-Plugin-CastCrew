@@ -86,16 +86,28 @@ public class CastCrewLibraryPersonMappingServiceTests
     }
 
     [Fact]
-    public void IsPersonInLibraries_ReturnsTrue_WhenPersonNotInMapping()
+    public void IsPersonInLibraries_ReturnsFalse_WhenPersonNotInMappingWithActiveFilter()
     {
-        // Persons not in the mapping should pass through (newly added persons)
+        // Active library filter only includes people that are explicitly mapped.
         var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
         {
             ["Tom Hanks"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "lib-1" }
         };
         var service = CreateServiceWithTestData(map);
 
-        Assert.True(service.IsPersonInLibraries("Unknown Person", new[] { "lib-1" }));
+        Assert.False(service.IsPersonInLibraries("Unknown Person", new[] { "lib-1" }));
+    }
+
+    [Fact]
+    public void IsPersonInLibraries_NormalizesGuidLibraryIds()
+    {
+        var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Tom Hanks"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "d9ebfb8a0f684fc6a86dd0bb6f773499" }
+        };
+        var service = CreateServiceWithTestData(map);
+
+        Assert.True(service.IsPersonInLibraries("Tom Hanks", new[] { "d9ebfb8a-0f68-4fc6-a86d-d0bb6f773499" }));
     }
 
     [Fact]

@@ -255,6 +255,8 @@ public sealed class CastCrewActorQueryService
             return persons;
         }
 
+        _mappingService.EnsureMappingBuilt();
+
         return persons
             .Where(person => _mappingService.IsPersonInLibraries(person.Name, includedLibraryIds))
             .ToList();

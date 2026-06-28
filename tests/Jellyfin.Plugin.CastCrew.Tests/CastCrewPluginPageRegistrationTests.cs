@@ -1,7 +1,10 @@
 using System.Xml.Serialization;
+using Jellyfin.Plugin.CastCrew.Services;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Serialization;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Reflection;
 using System.Text.Json.Nodes;
 using Xunit;
 
@@ -54,7 +57,18 @@ public sealed class CastCrewPluginPageRegistrationTests
             File.WriteAllText(configPath, "{ \"menuLinks\": [] }");
             File.WriteAllText(indexPath, "<html><head></head><body></body></html>");
 
-            var service = new CastCrewStartupSyncHostedService(paths, null!, NullLogger<CastCrewStartupSyncHostedService>.Instance);
+            var libraryManager = CreateNoOpProxy<ILibraryManager>();
+            var userManager = CreateNoOpProxy<IUserManager>();
+            var mappingService = new CastCrewLibraryPersonMappingService(
+                libraryManager,
+                userManager,
+                NullLogger<CastCrewLibraryPersonMappingService>.Instance);
+
+            var service = new CastCrewStartupSyncHostedService(
+                paths,
+                libraryManager,
+                mappingService,
+                NullLogger<CastCrewStartupSyncHostedService>.Instance);
             await service.StartAsync(CancellationToken.None);
 
             var rootJson = JsonNode.Parse(File.ReadAllText(configPath)) as JsonObject;
@@ -83,6 +97,12 @@ public sealed class CastCrewPluginPageRegistrationTests
             "castcrew-plugin-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static T CreateNoOpProxy<T>()
+        where T : class
+    {
+        return DispatchProxy.Create<T, NoOpDispatchProxy>();
     }
 
     private sealed class TestApplicationPaths : IApplicationPaths
@@ -157,6 +177,36 @@ public sealed class CastCrewPluginPageRegistrationTests
 
         public void CreateAndCheckMarker(string path, string markerName, bool recursive)
         {
+        }
+    }
+
+    private class NoOpDispatchProxy : DispatchProxy
+    {
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod is null || targetMethod.ReturnType == typeof(void))
+            {
+                return null;
+            }
+
+            var returnType = targetMethod.ReturnType;
+
+            if (returnType == typeof(string))
+            {
+                return string.Empty;
+            }
+
+            if (returnType.IsValueType)
+            {
+                return Activator.CreateInstance(returnType);
+            }
+
+            if (returnType.IsArray)
+            {
+                return Array.CreateInstance(returnType.GetElementType()!, 0);
+            }
+
+            return null;
         }
     }
 

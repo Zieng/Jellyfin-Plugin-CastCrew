@@ -49,13 +49,25 @@
             <div class="verticalSection">
                 <h3 class="sectionTitle">Media Library Filter</h3>
                 <div class="fieldDescription" style="margin-bottom: 1em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
-                <div id="libraryCheckboxContainer" class="checkboxList">
-                    <div class="loading" style="padding: 0.5em;">Loading libraries...</div>
+                <div class="folders">
+                    <div style="display:flex;align-items:center">
+                        <h1 style="margin:.5em 0">Included Libraries</h1>
+                        <button is="emby-button" id="addLibraryButton" type="button" class="fab btnAddFolder submit" title="Add Media Library">
+                            <span class="material-icons add" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="libraryPicker" class="emby-select-withcolor emby-select" style="min-width: 16rem;">
+                            <option value="">Loading media libraries...</option>
+                        </select>
+                    </div>
                 </div>
+                <div id="selectedLibrariesContainer" class="paperList folderList hide" style="margin-bottom: 1em;"></div>
+                <div id="librarySelectionHint" class="fieldDescription" style="margin-bottom: 0.5em;">No media libraries selected. All libraries are included.</div>
                 <button is="emby-button" id="refreshMappingButton" type="button" class="raised button-cancel" style="margin-top: 0.5em;">
                     <span>Refresh Person-Library Mapping</span>
                 </button>
-                <div class="fieldDescription">After changing library selections and saving, click this button to rebuild the person-to-library index. This is also done automatically on server restart.</div>
+                <div class="fieldDescription">The person-library mapping refreshes automatically after saving and when your media library content changes. Use this button to force a refresh immediately.</div>
             </div>
 
             <button is="emby-button" id="saveConfigButton" type="submit" class="raised button-submit block">
@@ -86,11 +98,15 @@
                 defaultSortBy: document.getElementById('defaultSortBy'),
                 enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
                 detailRoutePreference: document.getElementById('detailRoutePreference'),
-                libraryCheckboxContainer: document.getElementById('libraryCheckboxContainer'),
+                libraryPicker: document.getElementById('libraryPicker'),
+                addLibraryButton: document.getElementById('addLibraryButton'),
+                selectedLibrariesContainer: document.getElementById('selectedLibrariesContainer'),
+                librarySelectionHint: document.getElementById('librarySelectionHint'),
                 refreshMappingButton: document.getElementById('refreshMappingButton')
             };
 
             var availableLibraries = [];
+            var selectedLibraryIds = [];
 
             function normalizePageSize(value) {
                 var parsed = parseInt(value, 10);
@@ -119,104 +135,274 @@
                 return div.innerHTML;
             }
 
-            function renderLibraryCheckboxes(libraries, selectedIds) {
-                var container = refs.libraryCheckboxContainer;
-                if (!libraries || libraries.length === 0) {
-                    container.innerHTML = '<div class="fieldDescription">No media libraries found.</div>';
-                    return;
-                }
-
-                var selectedSet = {};
-                if (selectedIds && selectedIds.length > 0) {
-                    for (var i = 0; i < selectedIds.length; i++) {
-                        selectedSet[selectedIds[i]] = true;
-                    }
-                }
-
-                var html = '';
-                for (var j = 0; j < libraries.length; j++) {
-                    var lib = libraries[j];
-                    var checked = selectedSet[lib.Id] ? ' checked' : '';
-                    var typeLabel = lib.CollectionType ? ' (' + escapeHtml(lib.CollectionType) + ')' : '';
-                    html += '<div class="checkboxContainer checkboxContainer-withDescription">';
-                    html += '<label>';
-                    html += '<input is="emby-checkbox" type="checkbox" class="libraryCheckbox" data-library-id="' + escapeHtml(lib.Id) + '"' + checked + ' />';
-                    html += '<span>' + escapeHtml(lib.Name) + typeLabel + '</span>';
-                    html += '</label>';
-                    html += '</div>';
-                }
-                container.innerHTML = html;
-            }
-
-            function getSelectedLibraryIds() {
-                var checkboxes = refs.libraryCheckboxContainer.querySelectorAll('.libraryCheckbox');
-                var ids = [];
-                for (var i = 0; i < checkboxes.length; i++) {
-                    if (checkboxes[i].checked) {
-                        ids.push(checkboxes[i].getAttribute('data-library-id'));
-                    }
-                }
-                return ids;
-            }
-
-            function fetchLibraries() {
-                var headers = {};
-                if (window.ApiClient && window.ApiClient.getRequestHeaders) {
+            function getApiHeaders() {
+                var headers = { Accept: 'application/json' };
+                if (window.ApiClient && typeof window.ApiClient.getRequestHeaders === 'function') {
                     var reqHeaders = window.ApiClient.getRequestHeaders();
                     if (reqHeaders) {
+                        headers = {};
                         for (var key in reqHeaders) {
                             if (Object.prototype.hasOwnProperty.call(reqHeaders, key)) {
                                 headers[key] = reqHeaders[key];
                             }
                         }
+                        if (!headers.Accept && !headers.accept) {
+                            headers.Accept = 'application/json';
+                        }
+                    }
+                }
+                return headers;
+            }
+
+            function getApiUrl(path) {
+                if (window.ApiClient && typeof window.ApiClient.getUrl === 'function') {
+                    return window.ApiClient.getUrl(path);
+                }
+
+                if (!path) {
+                    return '/';
+                }
+
+                if (path.charAt(0) === '/') {
+                    return path;
+                }
+
+                return '/' + path;
+            }
+
+            function requestJson(url) {
+                if (window.ApiClient && typeof window.ApiClient.getJSON === 'function') {
+                    return window.ApiClient.getJSON(url);
+                }
+
+                return fetch(url, {
+                    method: 'GET',
+                    headers: getApiHeaders()
+                }).then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Request failed with status ' + response.status);
+                    }
+
+                    return response.json();
+                });
+            }
+
+            function postRequest(url) {
+                return fetch(url, {
+                    method: 'POST',
+                    headers: getApiHeaders()
+                }).then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Request failed with status ' + response.status);
+                    }
+
+                    return response;
+                });
+            }
+
+            function getLibraryById(libraryId) {
+                for (var i = 0; i < availableLibraries.length; i++) {
+                    if (availableLibraries[i].Id === libraryId) {
+                        return availableLibraries[i];
                     }
                 }
 
-                var url = window.ApiClient
-                    ? window.ApiClient.getUrl('CastCrew/Libraries')
-                    : '/CastCrew/Libraries';
+                return null;
+            }
 
-                return fetch(url, { headers: headers })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('Failed to fetch libraries: ' + response.status);
-                        }
-                        return response.json();
-                    })
+            function normalizeSelectedLibraryIds(ids) {
+                if (!ids || !ids.length) {
+                    return [];
+                }
+
+                var normalized = [];
+                var seen = {};
+                for (var i = 0; i < ids.length; i++) {
+                    var value = String(ids[i] || '').trim();
+                    if (!value || seen[value]) {
+                        continue;
+                    }
+
+                    if (getLibraryById(value)) {
+                        seen[value] = true;
+                        normalized.push(value);
+                    }
+                }
+
+                return normalized;
+            }
+
+            function getLibraryLabel(library) {
+                var name = library && library.Name ? library.Name : 'Unknown library';
+                var collectionType = library && library.CollectionType ? ' (' + library.CollectionType + ')' : '';
+                return name + collectionType;
+            }
+
+            function renderLibraryPicker() {
+                var picker = refs.libraryPicker;
+                var addButton = refs.addLibraryButton;
+
+                while (picker.firstChild) {
+                    picker.removeChild(picker.firstChild);
+                }
+
+                if (!availableLibraries || availableLibraries.length === 0) {
+                    var emptyOption = document.createElement('option');
+                    emptyOption.value = '';
+                    emptyOption.textContent = 'No media libraries found';
+                    picker.appendChild(emptyOption);
+                    addButton.disabled = true;
+                    return;
+                }
+
+                var selectedSet = {};
+                for (var i = 0; i < selectedLibraryIds.length; i++) {
+                    selectedSet[selectedLibraryIds[i]] = true;
+                }
+
+                var remainingLibraries = [];
+                for (var j = 0; j < availableLibraries.length; j++) {
+                    var library = availableLibraries[j];
+                    if (!selectedSet[library.Id]) {
+                        remainingLibraries.push(library);
+                    }
+                }
+
+                if (remainingLibraries.length === 0) {
+                    var fullOption = document.createElement('option');
+                    fullOption.value = '';
+                    fullOption.textContent = 'All media libraries are already included';
+                    picker.appendChild(fullOption);
+                    addButton.disabled = true;
+                    return;
+                }
+
+                for (var k = 0; k < remainingLibraries.length; k++) {
+                    var option = document.createElement('option');
+                    option.value = remainingLibraries[k].Id;
+                    option.textContent = getLibraryLabel(remainingLibraries[k]);
+                    picker.appendChild(option);
+                }
+
+                addButton.disabled = false;
+            }
+
+            function renderSelectedLibraries() {
+                var container = refs.selectedLibrariesContainer;
+
+                if (!selectedLibraryIds || selectedLibraryIds.length === 0) {
+                    container.classList.add('hide');
+                    container.innerHTML = '';
+                    refs.librarySelectionHint.style.display = 'block';
+                    refs.librarySelectionHint.textContent = 'No media libraries selected. All libraries are included.';
+                    return;
+                }
+
+                container.classList.remove('hide');
+                refs.librarySelectionHint.style.display = 'none';
+
+                var html = '';
+                for (var i = 0; i < selectedLibraryIds.length; i++) {
+                    var libraryId = selectedLibraryIds[i];
+                    var library = getLibraryById(libraryId);
+                    html += '<div class="listItem listItem-border lnkPath">';
+                    html += '<div class="' + (library && library.CollectionType ? 'listItemBody two-line' : 'listItemBody') + '">';
+                    html += '<div class="listItemBodyText" dir="ltr">' + escapeHtml(library ? library.Name : libraryId) + '</div>';
+                    if (library && library.CollectionType) {
+                        html += '<div class="listItemBodyText secondary" dir="ltr">' + escapeHtml(library.CollectionType) + '</div>';
+                    }
+                    html += '</div>';
+                    html += '<button type="button" is="paper-icon-button-light" class="listItemButton btnRemovePath" data-remove-library-id="' + escapeHtml(libraryId) + '" title="Remove media library">';
+                    html += '<span class="material-icons remove_circle" aria-hidden="true"></span>';
+                    html += '</button>';
+                    html += '</div>';
+                }
+
+                container.innerHTML = html;
+            }
+
+            function addSelectedLibrary() {
+                var nextLibraryId = refs.libraryPicker.value;
+                if (!nextLibraryId) {
+                    return;
+                }
+
+                if (selectedLibraryIds.indexOf(nextLibraryId) !== -1) {
+                    return;
+                }
+
+                selectedLibraryIds.push(nextLibraryId);
+                selectedLibraryIds = normalizeSelectedLibraryIds(selectedLibraryIds);
+                renderLibraryPicker();
+                renderSelectedLibraries();
+            }
+
+            function removeSelectedLibrary(libraryId) {
+                if (!libraryId) {
+                    return;
+                }
+
+                var nextSelection = [];
+                for (var i = 0; i < selectedLibraryIds.length; i++) {
+                    if (selectedLibraryIds[i] !== libraryId) {
+                        nextSelection.push(selectedLibraryIds[i]);
+                    }
+                }
+
+                selectedLibraryIds = nextSelection;
+                renderLibraryPicker();
+                renderSelectedLibraries();
+            }
+
+            function findRemoveLibraryButton(target) {
+                var current = target;
+                while (current && current !== refs.selectedLibrariesContainer) {
+                    if (current.classList && current.classList.contains('btnRemovePath') && current.getAttribute('data-remove-library-id')) {
+                        return current;
+                    }
+                    current = current.parentNode;
+                }
+
+                return null;
+            }
+
+            function fetchLibraries() {
+                var url = getApiUrl('CastCrew/Libraries');
+
+                return requestJson(url)
                     .then(function (libraries) {
-                        availableLibraries = libraries || [];
+                        availableLibraries = Array.isArray(libraries) ? libraries.slice() : [];
+                        availableLibraries.sort(function (left, right) {
+                            var leftName = (left && left.Name ? left.Name : '').toLowerCase();
+                            var rightName = (right && right.Name ? right.Name : '').toLowerCase();
+                            if (leftName < rightName) {
+                                return -1;
+                            }
+                            if (leftName > rightName) {
+                                return 1;
+                            }
+                            return 0;
+                        });
+
+                        selectedLibraryIds = normalizeSelectedLibraryIds(selectedLibraryIds);
+                        renderLibraryPicker();
+                        renderSelectedLibraries();
                         return availableLibraries;
                     })
                     .catch(function (error) {
                         console.error('[CastCrew]', error);
                         availableLibraries = [];
+                        selectedLibraryIds = [];
+                        renderLibraryPicker();
+                        renderSelectedLibraries();
                         return availableLibraries;
                     });
             }
 
             function refreshMapping() {
-                var headers = {};
-                if (window.ApiClient && window.ApiClient.getRequestHeaders) {
-                    var reqHeaders = window.ApiClient.getRequestHeaders();
-                    if (reqHeaders) {
-                        for (var key in reqHeaders) {
-                            if (Object.prototype.hasOwnProperty.call(reqHeaders, key)) {
-                                headers[key] = reqHeaders[key];
-                            }
-                        }
-                    }
-                }
-
-                var url = window.ApiClient
-                    ? window.ApiClient.getUrl('CastCrew/Libraries/RefreshMapping')
-                    : '/CastCrew/Libraries/RefreshMapping';
-
                 Dashboard.showLoadingMsg();
-                return fetch(url, { method: 'POST', headers: headers })
-                    .then(function (response) {
-                        if (!response.ok) {
-                            throw new Error('Failed to refresh mapping: ' + response.status);
-                        }
+                return requestMappingRefresh()
+                    .then(function () {
                         Dashboard.alert({
                             title: 'CastCrew',
                             message: 'Person-library mapping has been refreshed successfully.'
@@ -234,12 +420,19 @@
                     });
             }
 
+            function requestMappingRefresh() {
+                var url = getApiUrl('CastCrew/Libraries/RefreshMapping');
+                return postRequest(url);
+            }
+
             function applyConfig(config) {
                 refs.defaultPageSize.value = normalizePageSize(config.DefaultPageSize);
                 refs.defaultSortBy.value = normalizeSortBy(config.DefaultSortBy);
                 refs.enableCastCrewMainMenuEntry.checked = config.EnableCastCrewMainMenuEntry !== false;
                 refs.detailRoutePreference.value = normalizeRoutePreference(config.DetailRoutePreference);
-                renderLibraryCheckboxes(availableLibraries, config.IncludedLibraryIds || []);
+                selectedLibraryIds = normalizeSelectedLibraryIds(config.IncludedLibraryIds || []);
+                renderLibraryPicker();
+                renderSelectedLibraries();
             }
 
             function loadConfig() {
@@ -264,6 +457,8 @@
                 event.preventDefault();
                 Dashboard.showLoadingMsg();
 
+                var configurationSaved = false;
+                var pluginUpdateResult = null;
                 return window.ApiClient.getPluginConfiguration(pluginId)
                     .then(function (existingConfig) {
                         var config = existingConfig || {};
@@ -271,7 +466,7 @@
                         config.DefaultSortBy = normalizeSortBy(refs.defaultSortBy.value);
                         config.EnableCastCrewMainMenuEntry = refs.enableCastCrewMainMenuEntry.checked;
                         config.DetailRoutePreference = normalizeRoutePreference(refs.detailRoutePreference.value);
-                        config.IncludedLibraryIds = getSelectedLibraryIds();
+                        config.IncludedLibraryIds = selectedLibraryIds.slice();
 
                         refs.defaultPageSize.value = config.DefaultPageSize;
                         refs.defaultSortBy.value = config.DefaultSortBy;
@@ -280,10 +475,25 @@
                         return window.ApiClient.updatePluginConfiguration(pluginId, config);
                     })
                     .then(function (result) {
-                        Dashboard.processPluginConfigurationUpdateResult(result);
+                        configurationSaved = true;
+                        pluginUpdateResult = result;
+                        return requestMappingRefresh();
+                    })
+                    .then(function () {
+                        Dashboard.processPluginConfigurationUpdateResult(pluginUpdateResult);
                     })
                     .catch(function (error) {
                         console.error(error);
+
+                        if (configurationSaved) {
+                            Dashboard.processPluginConfigurationUpdateResult(pluginUpdateResult);
+                            Dashboard.alert({
+                                title: 'CastCrew',
+                                message: 'Configuration saved, but automatic person-library mapping refresh failed.'
+                            });
+                            return;
+                        }
+
                         Dashboard.alert({
                             title: 'CastCrew',
                             message: 'Failed to save configuration.'
@@ -295,6 +505,15 @@
             }
 
             refs.form.addEventListener('submit', saveConfig);
+            refs.addLibraryButton.addEventListener('click', addSelectedLibrary);
+            refs.selectedLibrariesContainer.addEventListener('click', function (event) {
+                var removeButton = findRemoveLibraryButton(event.target);
+                if (!removeButton) {
+                    return;
+                }
+
+                removeSelectedLibrary(removeButton.getAttribute('data-remove-library-id'));
+            });
             refs.refreshMappingButton.addEventListener('click', refreshMapping);
 
             configPage.addEventListener('pageshow', function () {
