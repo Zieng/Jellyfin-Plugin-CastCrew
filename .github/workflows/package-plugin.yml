@@ -135,7 +135,7 @@ jobs:
               "versions": [
                 {
                   "version": "${version}",
-                  "changelog": "${changelog}",
+                  "changelog": "Target ABI 10.11.x: ${changelog}",
                   "targetAbi": "10.11.0.0",
                   "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_11 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_11 }}",
@@ -143,7 +143,7 @@ jobs:
                 },
                 {
                   "version": "${version}",
-                  "changelog": "${changelog}",
+                  "changelog": "Target ABI 10.10.x: ${changelog}",
                   "targetAbi": "10.10.0.0",
                   "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_10 }}",
                   "checksum": "${{ steps.checksum.outputs.md5_10_10 }}",
