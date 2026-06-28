@@ -36,6 +36,14 @@
                 <div class="fieldDescription">Adds/removes a Cast & Crew link in the top banner (near Home/Favorites). A Jellyfin web reload may be required. If Jellyfin web assets are hosted from a read-only install path (for example Program Files on Windows or /Applications on macOS), run Jellyfin with a writable --webdir.</div>
             </div>
 
+            <div class="checkboxContainer checkboxContainer-withDescription">
+                <label>
+                    <input id="enableDebugLogging" is="emby-checkbox" type="checkbox" />
+                    <span>Enable verbose CastCrew debug logging</span>
+                </label>
+                <div class="fieldDescription">When enabled, CastCrew writes detailed logs for mapping, included-library selection, and mapping trigger reasons.</div>
+            </div>
+
             <div class="inputContainer">
                 <label class="inputLabel inputLabelUnfocused" for="detailRoutePreference">Person Detail Route Preference</label>
                 <select is="emby-select" id="detailRoutePreference" class="emby-select-withcolor emby-select">
@@ -65,10 +73,7 @@
                 </div>
                 <div id="librarySelectionHint" class="fieldDescription" style="margin-bottom: 0.5em;">Libraries currently included are listed below. If none are listed, all libraries are included.</div>
                 <div id="selectedLibrariesContainer" class="paperList folderList hide" style="margin-bottom: 1em;"></div>
-                <button is="emby-button" id="refreshMappingButton" type="button" class="raised button-cancel" style="margin-top: 0.5em;">
-                    <span>Refresh Person-Library Mapping</span>
-                </button>
-                <div class="fieldDescription">The person-library mapping refreshes automatically after saving and when your media library content changes. Use this button to force a refresh immediately.</div>
+                <div class="fieldDescription">The person-library mapping refreshes automatically whenever settings are saved and when your media library content changes.</div>
             </div>
 
             <button is="emby-button" id="saveConfigButton" type="submit" class="raised button-submit block">
@@ -98,12 +103,12 @@
                 defaultPageSize: document.getElementById('defaultPageSize'),
                 defaultSortBy: document.getElementById('defaultSortBy'),
                 enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
+                enableDebugLogging: document.getElementById('enableDebugLogging'),
                 detailRoutePreference: document.getElementById('detailRoutePreference'),
                 libraryPicker: document.getElementById('libraryPicker'),
                 addLibraryButton: document.getElementById('addLibraryButton'),
                 selectedLibrariesContainer: document.getElementById('selectedLibrariesContainer'),
-                librarySelectionHint: document.getElementById('librarySelectionHint'),
-                refreshMappingButton: document.getElementById('refreshMappingButton')
+                librarySelectionHint: document.getElementById('librarySelectionHint')
             };
 
             var availableLibraries = [];
@@ -137,22 +142,41 @@
             }
 
             function getApiHeaders() {
-                var headers = { Accept: 'application/json' };
                 if (window.ApiClient && typeof window.ApiClient.getRequestHeaders === 'function') {
                     var reqHeaders = window.ApiClient.getRequestHeaders();
                     if (reqHeaders) {
-                        headers = {};
+                        if (typeof Headers !== 'undefined') {
+                            // Normalize all supported header shapes (Headers/object/tuples) into native Headers.
+                            var normalizedHeaders = new Headers(reqHeaders);
+                            if (!normalizedHeaders.has('Accept')) {
+                                normalizedHeaders.set('Accept', 'application/json');
+                            }
+                            return normalizedHeaders;
+                        }
+
+                        // Legacy fallback when Headers is not available.
+                        var fallbackHeaders = {};
                         for (var key in reqHeaders) {
                             if (Object.prototype.hasOwnProperty.call(reqHeaders, key)) {
-                                headers[key] = reqHeaders[key];
+                                fallbackHeaders[key] = reqHeaders[key];
                             }
                         }
-                        if (!headers.Accept && !headers.accept) {
-                            headers.Accept = 'application/json';
+                        if (!fallbackHeaders.Accept && !fallbackHeaders.accept) {
+                            fallbackHeaders.Accept = 'application/json';
                         }
+                        return fallbackHeaders;
                     }
                 }
-                return headers;
+
+                var defaultHeaders = { Accept: 'application/json' };
+                if (window.ApiClient && typeof window.ApiClient.accessToken === 'function') {
+                    var accessToken = window.ApiClient.accessToken();
+                    if (accessToken) {
+                        defaultHeaders['X-Emby-Token'] = accessToken;
+                    }
+                }
+
+                return defaultHeaders;
             }
 
             function getApiUrl(path) {
@@ -189,6 +213,13 @@
             }
 
             function postRequest(url) {
+                if (window.ApiClient && typeof window.ApiClient.ajax === 'function') {
+                    return Promise.resolve(window.ApiClient.ajax({
+                        type: 'POST',
+                        url: url
+                    }));
+                }
+
                 return fetch(url, {
                     method: 'POST',
                     headers: getApiHeaders()
@@ -401,29 +432,8 @@
                     });
             }
 
-            function refreshMapping() {
-                Dashboard.showLoadingMsg();
-                return requestMappingRefresh()
-                    .then(function () {
-                        Dashboard.alert({
-                            title: 'CastCrew',
-                            message: 'Person-library mapping has been refreshed successfully.'
-                        });
-                    })
-                    .catch(function (error) {
-                        console.error('[CastCrew]', error);
-                        Dashboard.alert({
-                            title: 'CastCrew',
-                            message: 'Failed to refresh person-library mapping.'
-                        });
-                    })
-                    .finally(function () {
-                        Dashboard.hideLoadingMsg();
-                    });
-            }
-
             function requestMappingRefresh() {
-                var url = getApiUrl('CastCrew/Libraries/RefreshMapping');
+                var url = getApiUrl('CastCrew/Libraries/RefreshMapping?reason=settings-save');
                 return postRequest(url);
             }
 
@@ -431,6 +441,7 @@
                 refs.defaultPageSize.value = normalizePageSize(config.DefaultPageSize);
                 refs.defaultSortBy.value = normalizeSortBy(config.DefaultSortBy);
                 refs.enableCastCrewMainMenuEntry.checked = config.EnableCastCrewMainMenuEntry !== false;
+                refs.enableDebugLogging.checked = config.EnableDebugLogging === true;
                 refs.detailRoutePreference.value = normalizeRoutePreference(config.DetailRoutePreference);
                 selectedLibraryIds = normalizeSelectedLibraryIds(config.IncludedLibraryIds || []);
                 renderLibraryPicker();
@@ -467,6 +478,7 @@
                         config.DefaultPageSize = normalizePageSize(refs.defaultPageSize.value);
                         config.DefaultSortBy = normalizeSortBy(refs.defaultSortBy.value);
                         config.EnableCastCrewMainMenuEntry = refs.enableCastCrewMainMenuEntry.checked;
+                        config.EnableDebugLogging = refs.enableDebugLogging.checked;
                         config.DetailRoutePreference = normalizeRoutePreference(refs.detailRoutePreference.value);
                         config.IncludedLibraryIds = selectedLibraryIds.slice();
 
@@ -489,10 +501,7 @@
 
                         if (configurationSaved) {
                             Dashboard.processPluginConfigurationUpdateResult(pluginUpdateResult);
-                            Dashboard.alert({
-                                title: 'CastCrew',
-                                message: 'Configuration saved, but automatic person-library mapping refresh failed.'
-                            });
+                            console.error('[CastCrew] Automatic person-library mapping refresh failed after save; mapping will be retried automatically on startup and library changes.');
                             return;
                         }
 
@@ -516,7 +525,6 @@
 
                 removeSelectedLibrary(removeButton.getAttribute('data-remove-library-id'));
             });
-            refs.refreshMappingButton.addEventListener('click', refreshMapping);
 
             configPage.addEventListener('pageshow', function () {
                 loadConfig();

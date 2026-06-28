@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Jellyfin.Plugin.CastCrew</AssemblyName>
     <Version>0.1.0.1</Version>
+    <Version Condition="'$(GITHUB_ACTIONS)' != 'true' and '$(Version)' == '0.1.0.1'">0.1.$([System.String]::Concat($([System.DateTime]::UtcNow.ToString('yy')), $([System.DateTime]::UtcNow.DayOfYear.ToString('000')))).$([System.String]::Concat($([System.DateTime]::UtcNow.ToString('HH')), $([System.DateTime]::UtcNow.ToString('mm'))))</Version>
     <Company>CastCrew</Company>
     <Product>Jellyfin.Plugin.CastCrew</Product>
     <Description>Jellyfin plugin that adds a Cast and Crew library module.</Description>

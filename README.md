@@ -55,10 +55,11 @@ Go to **Dashboard → Plugins → CastCrew** to configure:
 | Page Size | 50 | Number of persons per page (10–200) |
 | Sort By | Name | Default sort mode (Name or DateCreated) |
 | Main Menu Entry | Enabled | Show/hide Cast&Crew in sidebar |
+| Debug Logging | Disabled | Enable verbose CastCrew logs for mapping triggers and per-library scan details |
 | Route Preference | Auto | Person detail navigation mode (Auto, HashBang, Hash) |
 | Included Libraries | All libraries | Restrict Cast & Crew results to people that appear in movies from selected libraries |
 
-Library-person mapping refreshes automatically after saving settings and when library content changes. A manual refresh button is still available in the settings page.
+Library-person mapping refreshes automatically after saving settings and when library content changes.
 
 ## Compatibility
 

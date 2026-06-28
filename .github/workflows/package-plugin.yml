@@ -121,7 +121,7 @@ jobs:
           version="${{ steps.version.outputs.value }}"
           pages_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          changelog="Try to fix the docker based jellyfin not working issue."
+          changelog="Fix person-library filtering, improve Cast & Crew settings UX, and add optional debug mapping logs."
           cat > artifacts/manifest.json << EOF
           [
             {

@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.CastCrew.Api;
 
@@ -16,12 +17,18 @@ public sealed class CastCrewController : ControllerBase
     private readonly IUserManager _userManager;
     private readonly CastCrewActorQueryService _actorQueryService;
     private readonly CastCrewLibraryPersonMappingService _mappingService;
+    private readonly ILogger<CastCrewController> _logger;
 
-    public CastCrewController(IUserManager userManager, CastCrewActorQueryService actorQueryService, CastCrewLibraryPersonMappingService mappingService)
+    public CastCrewController(
+        IUserManager userManager,
+        CastCrewActorQueryService actorQueryService,
+        CastCrewLibraryPersonMappingService mappingService,
+        ILogger<CastCrewController> logger)
     {
         _userManager = userManager;
         _actorQueryService = actorQueryService;
         _mappingService = mappingService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -89,8 +96,28 @@ public sealed class CastCrewController : ControllerBase
     [HttpPost("Libraries/RefreshMapping")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public ActionResult RefreshLibraryMapping()
+    public ActionResult RefreshLibraryMapping([FromQuery] string? reason = null)
     {
+        var configuration = CastCrewPlugin.Instance?.Configuration;
+        if (configuration?.EnableDebugLogging == true)
+        {
+            var includedLibraryIds = configuration.IncludedLibraryIds ?? Array.Empty<string>();
+            var includedLabel = includedLibraryIds.Length == 0
+                ? "(none configured; all libraries included)"
+                : string.Join(", ", includedLibraryIds);
+            var refreshReason = string.IsNullOrWhiteSpace(reason) ? "manual/api" : reason.Trim();
+
+            if (refreshReason.Equals("settings-save", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("[CastCrew][Debug] CastCrew settings saved, trigger person-to-library mapping.");
+            }
+
+            _logger.LogInformation(
+                "[CastCrew][Debug] Trigger person-to-library mapping (reason: {Reason}). Included libraries: {IncludedLibraries}.",
+                refreshReason,
+                includedLabel);
+        }
+
         _mappingService.RebuildMapping();
         return NoContent();
     }

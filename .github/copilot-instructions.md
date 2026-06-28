@@ -9,7 +9,7 @@
 | Run all tests | `dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj` |
 | Run a single test | `dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --filter "FullyQualifiedName~CastCrewActorQueryNormalizerTests"` |
 | Run integration tests | `CASTCREW_RUN_INTEGRATION_TESTS=true CASTCREW_BASE_URL=http://127.0.0.1:8096 CASTCREW_API_KEY=<key> dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj` |
-| Build release zip locally | `dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --framework net9.0 --output artifacts/publish && VERSION=$(sed -n '/<Version>/{s:.*<Version>\(.*\)</Version>.*:\1:p;q;}' src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj) && mkdir -p artifacts/CastCrew_${VERSION} && cp artifacts/publish/Jellyfin.Plugin.CastCrew.dll artifacts/CastCrew_${VERSION}/ && (cd artifacts && zip -r CastCrew_${VERSION}.zip CastCrew_${VERSION})` |
+| Build release zip locally | `VERSION=$(dotnet msbuild src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj -nologo -getProperty:Version | tail -n 1) && dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --framework net9.0 -p:Version=$VERSION --output artifacts/publish && mkdir -p artifacts/CastCrew_${VERSION} && cp artifacts/publish/Jellyfin.Plugin.CastCrew.dll artifacts/CastCrew_${VERSION}/ && (cd artifacts && zip -r CastCrew_${VERSION}.zip CastCrew_${VERSION})` |
 | Lint/format check | No dedicated lint command is configured in this repository. |
 
 The plugin and test projects multi-target `net8.0` (Jellyfin 10.10.x) and `net9.0` (Jellyfin 10.11.x). Test projects set `RollForward=Major`, so tests can run on newer installed runtimes (for example .NET 10) when neither .NET 8 nor .NET 9 runtime is present locally.
@@ -33,6 +33,8 @@ The developer runs a local Jellyfin instance (see `local_jellyfin_credentials.tm
 
 **Plugin deployment path:** `~/Library/Application Support/jellyfin/plugins/CastCrew_${version}/Jellyfin.Plugin.CastCrew.dll`
 
+When reporting local plugin deployment status, always include the effective local plugin version (for example `0.1.26180.1045`) and the deployed folder path.
+
 ## Copilot customization layout
 
 - **Global baseline:** `.github/copilot-instructions.md` (this file).
@@ -53,7 +55,7 @@ When making changes to architecture/workflow conventions, keep these locations i
 - The user-facing Cast & Crew UI is rendered by synchronized `Web/castcrew-top-banner-link.js` inside the native Jellyfin home-shell route (`/web/#/home?tab=cast_crew`) and consumes plugin-owned adapter APIs (`GET /CastCrew/Actors`, `GET /CastCrew/Directors`, `GET /CastCrew/Producers`); `Web/cast-crew-standalone.html` remains a compatibility redirect resource. This Web integration is the primary supported UX surface.
 - `CastCrewController` delegates actor querying to `CastCrewActorQueryService`, which uses `ILibraryManager` + `IDtoService` and normalizes query/config behavior via `CastCrewActorQueryNormalizer`.
 - Admin settings are served by embedded `Configuration/config.html` and persisted through `PluginConfiguration`.
-- Key plugin config values: `DefaultPageSize`, `DefaultSortBy`, `EnableCastCrewMainMenuEntry`, `DetailRoutePreference`.
+- Key plugin config values: `DefaultPageSize`, `DefaultSortBy`, `EnableCastCrewMainMenuEntry`, `EnableDebugLogging`, `DetailRoutePreference`.
 - CastCrew sidebar/top-banner auto-sync requires writable Jellyfin web assets (`/web/config.json` and `/web/index.html` updates). Windows installer runs that hit read-only `Program Files` web roots bootstrap `%LOCALAPPDATA%\Jellyfin\custom-web`, set user `JELLYFIN_WEB_DIR`, and refresh running Jellyfin tray launcher context for subsequent tray restarts; other hosts still need a writable `--webdir`.
 - Integration tests are opt-in (`CASTCREW_RUN_INTEGRATION_TESTS=true`) and require a live Jellyfin host plus credentials.
 - Packaging/release automation is implemented in `.github/workflows/package-plugin.yml`, producing `CastCrew_<Version>.zip` artifacts from release builds. The workflow runs on `ubuntu-latest`, but the produced package is host-platform agnostic for Jellyfin Linux/Windows/macOS.

@@ -10,6 +10,8 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public bool EnableCastCrewMainMenuEntry { get; set; } = true;
 
+    public bool EnableDebugLogging { get; set; } = false;
+
     public string DetailRoutePreference { get; set; } = CastCrewConfigurationDefaults.RoutePreferenceAuto;
 
     /// <summary>

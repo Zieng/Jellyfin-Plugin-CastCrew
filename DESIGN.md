@@ -17,10 +17,12 @@ dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.Cast
   --filter "FullyQualifiedName~CastCrewDockerIntegrationTests"
 
 # Deploy locally (macOS)
+VERSION=$(dotnet msbuild src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj -nologo -getProperty:Version | tail -n 1)
 dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj \
-  --configuration Debug --framework net8.0 --output artifacts/local
+  --configuration Debug --framework net8.0 -p:Version="$VERSION" --output artifacts/local
+mkdir -p ~/Library/Application\ Support/jellyfin/plugins/CastCrew_${VERSION}
 cp artifacts/local/Jellyfin.Plugin.CastCrew.dll \
-  ~/Library/Application\ Support/jellyfin/plugins/CastCrew_0.1.0.1/
+  ~/Library/Application\ Support/jellyfin/plugins/CastCrew_${VERSION}/
 # Then restart Jellyfin
 ```
 
@@ -196,6 +198,7 @@ Jellyfin starts
 | `DefaultPageSize` | int | 50 | 10–200 | Persons per page |
 | `DefaultSortBy` | string | `Name` | Name, DateCreated | Default sort field |
 | `EnableCastCrewMainMenuEntry` | bool | true | — | Show sidebar entry |
+| `EnableDebugLogging` | bool | false | — | Emit verbose mapping trigger and per-library mapping logs |
 | `DetailRoutePreference` | string | `Auto` | Auto, HashBang, Hash | Person detail route format |
 
 ---
@@ -260,7 +263,7 @@ Workflow: `.github/workflows/package-plugin.yml`
 - **Trigger:** Tag push (`v*`) or manual dispatch
 - **Steps:** Restore → Build → Unit tests → Integration tests (Docker excluded) → Publish → Zip → Checksum → Manifest → Upload artifacts → GitHub Release + Pages deploy
 - **Outputs:** `CastCrew_<version>_jellyfin-10.10.zip`, `CastCrew_<version>_jellyfin-10.11.zip`, `manifest.json`
-- **Version:** Derived from git tag (strips `v` prefix) or `.csproj` `<Version>`
+- **Version:** Derived from git tag (strips `v` prefix) in CI; local non-GitHub builds default to timestamped `0.1.yyDDD.HHmm`
 
 ---
 
