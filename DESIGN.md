@@ -101,9 +101,9 @@ src/Jellyfin.Plugin.CastCrew/
 │   ├── PluginConfiguration.cs          # Config model with defaults
 │   └── config.html                     # Admin configuration page (embedded)
 └── Web/
-    ├── actors.html                     # Main Cast & Crew browse UI (vanilla JS)
+    ├── actors.html                     # Legacy standalone browse page (vanilla JS)
     ├── cast-crew-standalone.html       # Legacy compatibility redirect
-    └── castcrew-top-banner-link.js     # Renders Cast&Crew inside Jellyfin home shell
+    └── castcrew-top-banner-link.js     # Primary Cast&Crew home-shell UI (filters, sync status, refresh)
 
 tests/
 ├── Jellyfin.Plugin.CastCrew.Tests/            # Unit tests (xUnit, net8.0+net9.0)
@@ -167,6 +167,7 @@ Jellyfin starts
 | `isFavorite` | bool | null | Filter favorites only |
 | `tag` | string | null | Filter by tag |
 | `productionLocation` | string | null | Filter by country/region |
+| `libraryIds` | string (csv) | null | Optional included-library filter (`<id1>,<id2>`) |
 | `userId` | string | null | User context for favorites |
 
 ### Response
@@ -181,6 +182,8 @@ Jellyfin starts
   "DetailRoutePreference": "Auto",
   "AvailableTags": ["tag1"],
   "AvailableProductionLocations": ["US", "UK"],
+  "AvailableLibraries": [{ "Id": "lib-1", "Name": "Movies" }],
+  "LibraryMappingLastSyncedUtc": "2026-06-28T08:30:00Z",
   // When searchTerm is set:
   "NameMatchItems": [...],
   "NameMatchCount": 5,
@@ -198,7 +201,7 @@ Jellyfin starts
 | `DefaultPageSize` | int | 50 | 10–200 | Persons per page |
 | `DefaultSortBy` | string | `Name` | Name, DateCreated | Default sort field |
 | `EnableCastCrewMainMenuEntry` | bool | true | — | Show sidebar entry |
-| `EnableDebugLogging` | bool | false | — | Emit verbose mapping trigger and per-library mapping logs |
+| `EnableDebugLogging` | bool | false | — | Emit verbose logs for API requests, query filtering, startup/web sync, and mapping |
 | `DetailRoutePreference` | string | `Auto` | Auto, HashBang, Hash | Person detail route format |
 
 ---

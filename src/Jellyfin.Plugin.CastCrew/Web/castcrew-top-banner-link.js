@@ -36,7 +36,11 @@
         loading: false,
         userId: null,
         authToken: null,
-        routePreference: 'Auto'
+        routePreference: 'Auto',
+        selectedLibraryId: '',
+        availableLibraries: [],
+        libraryMappingLastSyncedUtc: null,
+        mappingRefreshInProgress: false
     };
 
     var refs = null;
@@ -551,6 +555,8 @@
             '.cast_crew-host { padding: 0 1.25em 1.25em; --castcrew-control-bg: rgba(255,255,255,.07); --castcrew-control-bg-strong: rgba(255,255,255,.12); --castcrew-control-border: rgba(255,255,255,.22); --castcrew-menu-bg: #1c1c1c; --castcrew-menu-border: rgba(255,255,255,.2); --castcrew-menu-text: rgba(255,255,255,.95); }',
             '.castcrew-title-row { display: flex; align-items: center; justify-content: space-between; gap: .6em; }',
             '.castcrew-title-row .sectionTitle { margin: 0; }',
+            '.castcrew-title-actions { display: flex; align-items: center; gap: .45em; flex-wrap: wrap; justify-content: flex-end; }',
+            '.castcrew-sync-status { color: rgba(255,255,255,.72); font-size: .82em; }',
             '.castcrew-tabs { display: flex; gap: 0; margin-bottom: 1em; border-bottom: 1px solid rgba(255,255,255,.15); }',
             '.castcrew-tab { background: none; border: none; border-bottom: 2px solid transparent; color: rgba(255,255,255,.6); padding: .6em 1.2em; cursor: pointer; font-size: .95em; transition: color .2s, border-color .2s; }',
             '.castcrew-tab:hover { color: rgba(255,255,255,.9); }',
@@ -605,9 +611,15 @@
         host.innerHTML = '' +
             '<div class=\"sectionTitleContainer castcrew-title-row\">' +
                 '<h2 class=\"sectionTitle\">Cast &amp; Crew</h2>' +
-                '<button id=\"castcrewSettingsButton\" class=\"castcrew-icon-button\" type=\"button\" title=\"CastCrew settings\" aria-label=\"CastCrew settings\">' +
-                    '<span class=\"material-icons\">settings</span>' +
-                '</button>' +
+                '<div class=\"castcrew-title-actions\">' +
+                    '<span id=\"castcrewSyncStatus\" class=\"castcrew-sync-status\">Last synced: pending</span>' +
+                    '<button id=\"castcrewRefreshButton\" class=\"castcrew-icon-button\" type=\"button\" title=\"Refresh library mapping\" aria-label=\"Refresh library mapping\">' +
+                        '<span class=\"material-icons\">refresh</span>' +
+                    '</button>' +
+                    '<button id=\"castcrewSettingsButton\" class=\"castcrew-icon-button\" type=\"button\" title=\"CastCrew settings\" aria-label=\"CastCrew settings\">' +
+                        '<span class=\"material-icons\">settings</span>' +
+                    '</button>' +
+                '</div>' +
             '</div>' +
             '<div class=\"castcrew-tabs\" role=\"tablist\">' +
                 '<button class=\"castcrew-tab castcrew-tab-active\" type=\"button\" role=\"tab\" data-tab=\"Actors\" aria-selected=\"true\">Actors</button>' +
@@ -635,6 +647,10 @@
                         '<span class=\"material-icons\">filter_list</span>' +
                     '</button>' +
                     '<div id=\"castcrewFilterMenu\" class=\"castcrew-filter-menu\" hidden>' +
+                        '<label class=\"castcrew-filter-label\" for=\"castcrewLibraryFilter\">Library</label>' +
+                        '<select id=\"castcrewLibraryFilter\" class=\"castcrew-filter-select\">' +
+                            '<option value=\"\">All libraries</option>' +
+                        '</select>' +
                         '<label class=\"castcrew-filter-option\"><input type=\"checkbox\" id=\"castcrewFavFilter\" /> Favorites only</label>' +
                         '<label class=\"castcrew-filter-label\" for=\"castcrewTagFilter\">Tags</label>' +
                         '<select id=\"castcrewTagFilter\" class=\"castcrew-filter-select\">' +
@@ -700,11 +716,14 @@
             searchInput: host.querySelector('#castcrewSearchInput'),
             sortSelect: host.querySelector('#castcrewSortSelect'),
             searchButton: host.querySelector('#castcrewSearchButton'),
+            syncStatus: host.querySelector('#castcrewSyncStatus'),
+            refreshButton: host.querySelector('#castcrewRefreshButton'),
             settingsButton: host.querySelector('#castcrewSettingsButton'),
             countIndicator: host.querySelector('#castcrewCountIndicator'),
             viewToggle: host.querySelector('#castcrewViewToggle'),
             filterButton: host.querySelector('#castcrewFilterButton'),
             filterMenu: host.querySelector('#castcrewFilterMenu'),
+            libraryFilter: host.querySelector('#castcrewLibraryFilter'),
             favFilter: host.querySelector('#castcrewFavFilter'),
             tagFilter: host.querySelector('#castcrewTagFilter'),
             countryFilter: host.querySelector('#castcrewCountryFilter'),
@@ -742,6 +761,7 @@
         });
 
         refs.searchButton.addEventListener('click', runSearch);
+        refs.refreshButton.addEventListener('click', refreshLibraryMapping);
         refs.settingsButton.addEventListener('click', openCastCrewSettings);
         refs.searchInput.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
@@ -771,6 +791,11 @@
         // Filter toggle
         refs.filterButton.addEventListener('click', function () {
             refs.filterMenu.hidden = !refs.filterMenu.hidden;
+        });
+        refs.libraryFilter.addEventListener('change', function () {
+            state.selectedLibraryId = refs.libraryFilter.value || '';
+            state.pageIndex = 0;
+            fetchActors();
         });
         refs.favFilter.addEventListener('change', function () {
             state.pageIndex = 0;
@@ -803,6 +828,9 @@
             state.pageIndex += 1;
             fetchActors();
         });
+
+        renderSyncStatus();
+        updateRefreshButtonState();
     }
 
     function showState(message, isError) {
@@ -858,16 +886,87 @@
         }
     }
 
+    function formatSyncTimestamp(timestampUtc) {
+        if (!timestampUtc) {
+            return '';
+        }
+
+        var parsed = new Date(timestampUtc);
+        if (Number.isNaN(parsed.getTime())) {
+            return '';
+        }
+
+        return parsed.toLocaleString();
+    }
+
+    function renderSyncStatus() {
+        if (!refs || !refs.syncStatus) {
+            return;
+        }
+
+        var formatted = formatSyncTimestamp(state.libraryMappingLastSyncedUtc);
+        refs.syncStatus.textContent = formatted
+            ? 'Last synced at ' + formatted
+            : 'Last synced: pending';
+    }
+
+    function updateRefreshButtonState() {
+        if (!refs || !refs.refreshButton) {
+            return;
+        }
+
+        refs.refreshButton.disabled = state.loading || state.mappingRefreshInProgress;
+    }
+
+    function replaceLibraryFilterOptions(selectEl, libraries, defaultLabel) {
+        if (!selectEl) {
+            return;
+        }
+
+        var previousValue = selectEl.value || state.selectedLibraryId || '';
+        var nextLibraries = Array.isArray(libraries) ? libraries : [];
+
+        selectEl.innerHTML = '';
+
+        var defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.textContent = defaultLabel;
+        selectEl.appendChild(defaultOption);
+
+        nextLibraries.forEach(function (library) {
+            if (!library || !library.Id) {
+                return;
+            }
+
+            var option = document.createElement('option');
+            option.value = String(library.Id);
+            option.textContent = library.Name ? String(library.Name) : String(library.Id);
+            selectEl.appendChild(option);
+        });
+
+        selectEl.value = previousValue;
+        if (selectEl.value !== previousValue) {
+            selectEl.value = '';
+        }
+
+        state.selectedLibraryId = selectEl.value || '';
+    }
+
     function updateFilterOptions(payload) {
         if (!refs) {
             return;
         }
 
+        var availableLibraries = payload && Array.isArray(payload.AvailableLibraries)
+            ? payload.AvailableLibraries
+            : [];
         var availableTags = payload && Array.isArray(payload.AvailableTags) ? payload.AvailableTags : [];
         var availableLocations = payload && Array.isArray(payload.AvailableProductionLocations)
             ? payload.AvailableProductionLocations
             : [];
 
+        state.availableLibraries = availableLibraries;
+        replaceLibraryFilterOptions(refs.libraryFilter, availableLibraries, 'All libraries');
         replaceFilterSelectOptions(refs.tagFilter, availableTags, 'All tags');
         replaceFilterSelectOptions(refs.countryFilter, availableLocations, 'All countries/regions');
     }
@@ -936,6 +1035,9 @@
         if (refs && refs.countryFilter && refs.countryFilter.value) {
             params.set('productionLocation', refs.countryFilter.value);
         }
+        if (refs && refs.libraryFilter && refs.libraryFilter.value) {
+            params.set('libraryIds', refs.libraryFilter.value);
+        }
 
         var endpoint = '/CastCrew/' + state.activeTab;
         return endpoint + '?' + params.toString();
@@ -953,6 +1055,26 @@
         }
 
         return headers;
+    }
+
+    function postRequest(url) {
+        if (window.ApiClient && typeof window.ApiClient.ajax === 'function') {
+            return Promise.resolve(window.ApiClient.ajax({
+                type: 'POST',
+                url: url
+            }));
+        }
+
+        return fetch(url, {
+            method: 'POST',
+            headers: buildRequestHeaders()
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('Request failed with status ' + response.status);
+            }
+
+            return response;
+        });
     }
 
     function getPrimaryImageUrl(person) {
@@ -1088,6 +1210,31 @@
         window.location.href = '/web/index.html' + route;
     }
 
+    function refreshLibraryMapping() {
+        if (!refs || state.mappingRefreshInProgress) {
+            return;
+        }
+
+        state.mappingRefreshInProgress = true;
+        updateRefreshButtonState();
+
+        var endpoint = '/CastCrew/Libraries/RefreshMapping?reason=home-refresh-button';
+        postRequest(endpoint)
+            .then(function () {
+                return fetchActors();
+            })
+            .catch(function (error) {
+                var errorMessage = error && error.message ? error.message : 'Unknown error';
+                if (refs && refs.syncStatus) {
+                    refs.syncStatus.textContent = 'Last sync refresh failed (' + errorMessage + ')';
+                }
+            })
+            .finally(function () {
+                state.mappingRefreshInProgress = false;
+                updateRefreshButtonState();
+            });
+    }
+
     function renderCardHtml(person) {
         var imageUrl = getPrimaryImageUrl(person);
         var name = person.Name || '';
@@ -1215,6 +1362,7 @@
         state.descMatchCount = null;
         renderMeta();
         renderPagination();
+        updateRefreshButtonState();
 
         var url = buildActorsUrl();
         var requestPromise;
@@ -1267,6 +1415,10 @@
                     state.pageIndex = Math.floor(payload.StartIndex / state.pageSize);
                 }
 
+                state.libraryMappingLastSyncedUtc = payload && payload.LibraryMappingLastSyncedUtc
+                    ? payload.LibraryMappingLastSyncedUtc
+                    : null;
+                renderSyncStatus();
                 updateFilterOptions(payload);
 
                 state.sortBy = normalizeSortBy(payload && payload.SortBy ? payload.SortBy : state.sortBy);
@@ -1313,6 +1465,7 @@
                 state.loading = false;
                 renderMeta();
                 renderPagination();
+                updateRefreshButtonState();
             });
     }
 
@@ -1334,6 +1487,9 @@
         }
         if (refs && refs.countryFilter && refs.countryFilter.value) {
             params.set('productionLocation', refs.countryFilter.value);
+        }
+        if (refs && refs.libraryFilter && refs.libraryFilter.value) {
+            params.set('libraryIds', refs.libraryFilter.value);
         }
         var endpoint = '/CastCrew/' + state.activeTab;
         var url = endpoint + '?' + params.toString();

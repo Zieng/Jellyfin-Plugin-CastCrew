@@ -8,8 +8,9 @@
     <div class="content-primary">
         <div class="verticalSection">
             <div class="sectionTitleContainer">
-                <h2 class="sectionTitle">CastCrew</h2>
+                <h2 class="sectionTitle">CastCrew <span id="pluginVersionLabel" style="font-size: 0.7em; font-weight: 400; opacity: 0.8;"></span></h2>
             </div>
+            <div class="fieldDescription"><a href="https://github.com/Zieng/Jellyfin-Plugin-CastCrew" target="_blank" rel="noreferrer noopener">Project homepage</a></div>
         </div>
         <hr class="solid">
 
@@ -41,7 +42,7 @@
                     <input id="enableDebugLogging" is="emby-checkbox" type="checkbox" />
                     <span>Enable verbose CastCrew debug logging</span>
                 </label>
-                <div class="fieldDescription">When enabled, CastCrew writes detailed logs for mapping, included-library selection, and mapping trigger reasons.</div>
+                <div class="fieldDescription">When enabled, CastCrew writes detailed logs for API requests, query filtering, startup/web sync, and person-library mapping.</div>
             </div>
 
             <div class="inputContainer">
@@ -55,10 +56,9 @@
             </div>
 
             <div class="verticalSection">
-                <h3 class="sectionTitle">Media Library Filter</h3>
-                <div class="fieldDescription" style="margin-bottom: 1em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
                 <div class="folders">
                     <h1 style="margin:.5em 0">Included Libraries</h1>
+                    <div class="fieldDescription" style="margin-bottom: 0.5em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
                     <div class="fieldDescription" style="margin-bottom: 0.5em;">Select a media library from the list, then click + to include it.</div>
                     <div style="display:flex;align-items:center;gap:0.5em;margin-bottom:0.75em;">
                         <div class="selectContainer" style="margin:0;flex:1 1 auto;min-width:16rem;">
@@ -100,6 +100,7 @@
 
             var refs = {
                 form: document.getElementById('castCrewConfigurationForm'),
+                pluginVersionLabel: document.getElementById('pluginVersionLabel'),
                 defaultPageSize: document.getElementById('defaultPageSize'),
                 defaultSortBy: document.getElementById('defaultSortBy'),
                 enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
@@ -432,6 +433,36 @@
                     });
             }
 
+            function setPluginVersionLabel(versionText) {
+                if (!refs.pluginVersionLabel) {
+                    return;
+                }
+
+                refs.pluginVersionLabel.textContent = versionText ? ('v' + versionText) : '';
+            }
+
+            function loadPluginVersion() {
+                var url = getApiUrl('CastCrew/Manifest');
+
+                return requestJson(url)
+                    .then(function (manifestItems) {
+                        if (!Array.isArray(manifestItems) || manifestItems.length === 0) {
+                            setPluginVersionLabel('');
+                            return;
+                        }
+
+                        var manifest = manifestItems[0] || {};
+                        var versions = Array.isArray(manifest.versions) ? manifest.versions : [];
+                        var version = versions.length > 0 && versions[0] && versions[0].version
+                            ? String(versions[0].version).trim()
+                            : '';
+                        setPluginVersionLabel(version);
+                    })
+                    .catch(function () {
+                        setPluginVersionLabel('');
+                    });
+            }
+
             function requestMappingRefresh() {
                 var url = getApiUrl('CastCrew/Libraries/RefreshMapping?reason=settings-save');
                 return postRequest(url);
@@ -451,7 +482,7 @@
             function loadConfig() {
                 Dashboard.showLoadingMsg();
 
-                return fetchLibraries()
+                return Promise.all([fetchLibraries(), loadPluginVersion()])
                     .then(function () {
                         return window.ApiClient.getPluginConfiguration(pluginId);
                     })

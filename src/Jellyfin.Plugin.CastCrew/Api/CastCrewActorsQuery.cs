@@ -18,5 +18,7 @@ public sealed class CastCrewActorsQuery
 
     public string? ProductionLocation { get; set; }
 
+    public string? LibraryIds { get; set; }
+
     public Guid? UserId { get; set; }
 }

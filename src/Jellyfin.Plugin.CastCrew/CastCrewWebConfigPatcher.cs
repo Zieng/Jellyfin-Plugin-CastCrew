@@ -39,6 +39,8 @@ internal static class CastCrewWebConfigPatcher
 
     public static CastCrewWebConfigSyncStatus SyncCastCrewMenuLink(string? webPath, bool enabled, ILogger? logger = null)
     {
+        LogDebug(logger, "SyncCastCrewMenuLink invoked. Enabled={0}, WebPath='{1}'.", enabled, webPath ?? "(null)");
+
         if (string.IsNullOrWhiteSpace(webPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath is empty.");
@@ -130,6 +132,7 @@ internal static class CastCrewWebConfigPatcher
 
             if (!changed)
             {
+                LogDebug(logger, "Cast & Crew menu link already in desired state (enabled={0}).", enabled);
                 LastSyncStatus = CastCrewWebConfigSyncStatus.Succeeded;
                 return LastSyncStatus;
             }
@@ -144,6 +147,7 @@ internal static class CastCrewWebConfigPatcher
                 root.ToJsonString(jsonOptions) + Environment.NewLine);
 
             Log(logger, LogLevel.Information, "Successfully synced Cast & Crew menu link (enabled={0}).", enabled);
+            LogDebug(logger, "Wrote updated menuLinks configuration to '{0}'.", configPath);
             LastSyncStatus = CastCrewWebConfigSyncStatus.Succeeded;
             return LastSyncStatus;
         }
@@ -233,6 +237,7 @@ internal static class CastCrewWebConfigPatcher
             var existingContent = File.ReadAllText(outputPath);
             if (string.Equals(existingContent, outputContent, StringComparison.Ordinal))
             {
+                LogDebug(logger, "Embedded asset '{0}' is already up to date.", outputPath);
                 return true;
             }
         }
@@ -240,6 +245,7 @@ internal static class CastCrewWebConfigPatcher
         try
         {
             File.WriteAllText(outputPath, outputContent);
+            LogDebug(logger, "Synchronized embedded asset '{0}'.", outputPath);
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -272,6 +278,7 @@ internal static class CastCrewWebConfigPatcher
         var containsScriptTag = indexContent.Contains(TopBannerScriptTag, StringComparison.Ordinal);
         if (enabled == containsScriptTag)
         {
+            LogDebug(logger, "Top-banner script tag already in desired state (enabled={0}).", enabled);
             return true;
         }
 
@@ -308,6 +315,7 @@ internal static class CastCrewWebConfigPatcher
             try
             {
                 File.WriteAllText(indexPath, updatedContent);
+                LogDebug(logger, "Updated top-banner script tag in '{0}'.", indexPath);
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -413,6 +421,7 @@ internal static class CastCrewWebConfigPatcher
                 File.Exists(fallbackConfigPath) &&
                 File.Exists(fallbackIndexPath))
             {
+                LogDebug(logger, "Writable web root fallback already configured at '{0}'.", fallbackWebRoot);
                 refreshTrayWithWebDir?.Invoke(fallbackWebRoot);
                 return true;
             }
@@ -421,6 +430,7 @@ internal static class CastCrewWebConfigPatcher
             setEnvironmentVariable(JellyfinWebDirEnvVar, fallbackWebRoot, EnvironmentVariableTarget.User);
             NotifyEnvironmentChanged(logger);
             refreshTrayWithWebDir?.Invoke(fallbackWebRoot);
+            LogDebug(logger, "Configured writable web root fallback at '{0}'.", fallbackWebRoot);
             return true;
         }
         catch (ArgumentException ex)
@@ -611,5 +621,10 @@ internal static class CastCrewWebConfigPatcher
         {
             Console.Error.WriteLine("[CastCrew] " + message);
         }
+    }
+
+    private static void LogDebug(ILogger? logger, string message, params object[] args)
+    {
+        CastCrewDebugLogging.LogInformation(logger, message, args);
     }
 }

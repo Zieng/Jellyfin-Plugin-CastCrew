@@ -30,6 +30,12 @@ public sealed class CastCrewStartupSyncHostedService : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         var configuration = CastCrewPlugin.Instance?.Configuration ?? new PluginConfiguration();
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Startup sync beginning. MainMenuEntryEnabled={MainMenuEntryEnabled}, IncludedLibraryCount={IncludedLibraryCount}.",
+            configuration.EnableCastCrewMainMenuEntry,
+            configuration.IncludedLibraryIds?.Length ?? 0);
+
         _ = CastCrewWebConfigPatcher.SyncCastCrewMenuLink(
             _applicationPaths.WebPath,
             configuration.EnableCastCrewMainMenuEntry,
@@ -41,9 +47,11 @@ public sealed class CastCrewStartupSyncHostedService : IHostedService
             _libraryManager.ItemUpdated += OnLibraryItemChanged;
             _libraryManager.ItemRemoved += OnLibraryItemChanged;
             _libraryEventsRegistered = true;
+            CastCrewDebugLogging.LogInformation(_logger, "Registered CastCrew library change listeners.");
         }
 
         _mappingService.QueueRebuild("plugin startup", TimeSpan.Zero);
+        CastCrewDebugLogging.LogInformation(_logger, "Queued initial mapping rebuild on startup.");
 
         return Task.CompletedTask;
     }
@@ -56,9 +64,11 @@ public sealed class CastCrewStartupSyncHostedService : IHostedService
             _libraryManager.ItemUpdated -= OnLibraryItemChanged;
             _libraryManager.ItemRemoved -= OnLibraryItemChanged;
             _libraryEventsRegistered = false;
+            CastCrewDebugLogging.LogInformation(_logger, "Unregistered CastCrew library change listeners.");
         }
 
         _mappingService.CancelPendingRebuild();
+        CastCrewDebugLogging.LogInformation(_logger, "Cancelled pending mapping rebuild requests on shutdown.");
 
         return Task.CompletedTask;
     }
@@ -68,10 +78,14 @@ public sealed class CastCrewStartupSyncHostedService : IHostedService
         var configuration = CastCrewPlugin.Instance?.Configuration;
         if (configuration?.IncludedLibraryIds is null || configuration.IncludedLibraryIds.Length == 0)
         {
+            CastCrewDebugLogging.LogInformation(
+                _logger,
+                "Ignoring library change trigger because IncludedLibraryIds is empty (all libraries mode).");
             return;
         }
 
         var updateReason = eventArgs.UpdateReason.ToString();
+        CastCrewDebugLogging.LogInformation(_logger, "Library item changed. UpdateReason={UpdateReason}.", updateReason);
         _mappingService.QueueRebuild("library item changed: " + updateReason);
     }
 }

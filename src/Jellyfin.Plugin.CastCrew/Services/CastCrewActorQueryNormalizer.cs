@@ -23,6 +23,7 @@ public static class CastCrewActorQueryNormalizer
             SearchTerm = NormalizeSearchTerm(query.SearchTerm),
             Tag = NormalizeFacetValue(query.Tag),
             ProductionLocation = NormalizeFacetValue(query.ProductionLocation),
+            RequestedLibraryIds = NormalizeLibraryIds(query.LibraryIds),
             SortBy = NormalizeSortBy(query.SortBy, configuration.DefaultSortBy),
             SortOrder = NormalizeSortOrder(query.SortOrder),
             IsFavorite = query.IsFavorite,
@@ -95,6 +96,21 @@ public static class CastCrewActorQueryNormalizer
         return value.Trim();
     }
 
+    private static IReadOnlyList<string> NormalizeLibraryIds(string? rawLibraryIds)
+    {
+        if (string.IsNullOrWhiteSpace(rawLibraryIds))
+        {
+            return Array.Empty<string>();
+        }
+
+        return rawLibraryIds
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(CastCrewLibraryIdNormalizer.NormalizeLibraryId)
+            .Where(libraryId => libraryId.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     private static bool TryNormalizeSortBy(string? value, out string normalizedSortBy)
     {
         if (string.Equals(value, CastCrewConfigurationDefaults.SortByDateCreated, StringComparison.OrdinalIgnoreCase))
@@ -147,6 +163,8 @@ public sealed class NormalizedCastCrewActorQuery
     public string? Tag { get; init; }
 
     public string? ProductionLocation { get; init; }
+
+    public IReadOnlyList<string> RequestedLibraryIds { get; init; } = Array.Empty<string>();
 
     public required string DetailRoutePreference { get; init; }
 }

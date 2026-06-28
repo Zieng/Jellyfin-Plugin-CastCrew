@@ -79,6 +79,22 @@ public class CastCrewActorQueryNormalizerTests
         Assert.Null(result.ProductionLocation);
     }
 
+    [Fact]
+    public void Normalize_NormalizesAndDeduplicatesLibraryIds()
+    {
+        var config = new PluginConfiguration();
+        var query = new CastCrewActorsQuery
+        {
+            LibraryIds = "lib-1, d9ebfb8a-0f68-4fc6-a86d-d0bb6f773499, lib-1"
+        };
+
+        var result = CastCrewActorQueryNormalizer.Normalize(query, config);
+
+        Assert.Equal(2, result.RequestedLibraryIds.Count);
+        Assert.Contains("lib-1", result.RequestedLibraryIds);
+        Assert.Contains("d9ebfb8a0f684fc6a86dd0bb6f773499", result.RequestedLibraryIds);
+    }
+
     [Theory]
     [InlineData("hash", CastCrewConfigurationDefaults.RoutePreferenceHash)]
     [InlineData("HASHBANG", CastCrewConfigurationDefaults.RoutePreferenceHashBang)]

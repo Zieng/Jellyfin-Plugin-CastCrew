@@ -46,4 +46,15 @@ public sealed class CastCrewActorsResponse
     /// Count of persons whose description matched the search term.
     /// </summary>
     public int? DescriptionMatchCount { get; set; }
+
+    /// <summary>
+    /// Available library filter options for this response scope.
+    /// </summary>
+    public IReadOnlyList<CastCrewLibraryOption> AvailableLibraries { get; set; } = Array.Empty<CastCrewLibraryOption>();
+
+    /// <summary>
+    /// UTC timestamp of the latest completed person-to-library mapping build.
+    /// Null when mapping has not completed yet.
+    /// </summary>
+    public DateTime? LibraryMappingLastSyncedUtc { get; set; }
 }

@@ -40,10 +40,12 @@ Jellyfin will automatically select the correct version for your server (10.10.x 
 - **Role tabs** — Switch between Actors, Directors, and Producers
 - **Search** — Filter by name with grouped name/description matches
 - **Sort & Filter** — Sort by Name, DateCreated, or Random; filter by favorites, tags, or country/region
+- **Library filter** — Narrow Cast & Crew results to a specific included library (default: all included libraries)
 - **Library-scoped people** — Optionally include specific libraries and show only cast/crew that appear in those libraries
 - **Pagination** — Browse large libraries without performance issues
 - **Person detail** — Click any person to open their native Jellyfin detail page
 - **Quick settings** — Gear shortcut in the Cast & Crew page header opens CastCrew settings directly
+- **Sync controls** — Header shows latest person-library sync time and provides a manual refresh button
 - **Multi-language** — UI strings available in English and Chinese
 
 ## Configuration
@@ -55,11 +57,11 @@ Go to **Dashboard → Plugins → CastCrew** to configure:
 | Page Size | 50 | Number of persons per page (10–200) |
 | Sort By | Name | Default sort mode (Name or DateCreated) |
 | Main Menu Entry | Enabled | Show/hide Cast&Crew in sidebar |
-| Debug Logging | Disabled | Enable verbose CastCrew logs for mapping triggers and per-library scan details |
+| Debug Logging | Disabled | Enable verbose CastCrew logs for plugin debug. |
 | Route Preference | Auto | Person detail navigation mode (Auto, HashBang, Hash) |
 | Included Libraries | All libraries | Restrict Cast & Crew results to people that appear in movies from selected libraries |
 
-Library-person mapping refreshes automatically after saving settings and when library content changes.
+Library-person mapping refreshes automatically after saving settings and when library content changes. The Cast & Crew page header also includes a manual refresh button and displays the latest sync timestamp.
 
 ## Compatibility
 

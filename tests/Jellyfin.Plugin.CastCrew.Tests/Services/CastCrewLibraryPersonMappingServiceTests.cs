@@ -10,7 +10,8 @@ public class CastCrewLibraryPersonMappingServiceTests
     /// This bypasses ILibraryManager to test only the filtering logic.
     /// </summary>
     private static CastCrewLibraryPersonMappingService CreateServiceWithTestData(
-        Dictionary<string, HashSet<string>> personLibraryMap)
+        Dictionary<string, HashSet<string>> personLibraryMap,
+        Dictionary<string, string>? mappedLibraries = null)
     {
 #pragma warning disable SYSLIB0050
         var service = (CastCrewLibraryPersonMappingService)System.Runtime.Serialization.FormatterServices
@@ -25,6 +26,12 @@ public class CastCrewLibraryPersonMappingServiceTests
         var lockField = typeof(CastCrewLibraryPersonMappingService)
             .GetField("_lock", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
         lockField.SetValue(service, new object());
+
+        var mappedLibrariesField = typeof(CastCrewLibraryPersonMappingService)
+            .GetField("_mappedLibraryNames", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        mappedLibrariesField.SetValue(
+            service,
+            mappedLibraries ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
         return service;
     }
@@ -163,5 +170,25 @@ public class CastCrewLibraryPersonMappingServiceTests
         Assert.Contains("lib-1", result);
         Assert.Contains("lib-2", result);
         Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void GetMappedLibraries_ReturnsSortedLibraries()
+    {
+        var map = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var mappedLibraries = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["lib-b"] = "Bravo",
+            ["lib-a"] = "Alpha"
+        };
+        var service = CreateServiceWithTestData(map, mappedLibraries);
+
+        var result = service.GetMappedLibraries();
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("lib-a", result[0].Id);
+        Assert.Equal("Alpha", result[0].Name);
+        Assert.Equal("lib-b", result[1].Id);
+        Assert.Equal("Bravo", result[1].Name);
     }
 }

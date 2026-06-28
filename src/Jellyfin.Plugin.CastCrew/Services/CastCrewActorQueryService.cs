@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Querying;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.CastCrew.Services;
 
@@ -13,12 +14,18 @@ public sealed class CastCrewActorQueryService
     private readonly ILibraryManager _libraryManager;
     private readonly IDtoService _dtoService;
     private readonly CastCrewLibraryPersonMappingService _mappingService;
+    private readonly ILogger<CastCrewActorQueryService> _logger;
 
-    public CastCrewActorQueryService(ILibraryManager libraryManager, IDtoService dtoService, CastCrewLibraryPersonMappingService mappingService)
+    public CastCrewActorQueryService(
+        ILibraryManager libraryManager,
+        IDtoService dtoService,
+        CastCrewLibraryPersonMappingService mappingService,
+        ILogger<CastCrewActorQueryService> logger)
     {
         _libraryManager = libraryManager;
         _dtoService = dtoService;
         _mappingService = mappingService;
+        _logger = logger;
     }
 
 #if JELLYFIN_10_11
@@ -50,6 +57,30 @@ public sealed class CastCrewActorQueryService
     {
         var configuration = CastCrewPlugin.Instance?.Configuration ?? new PluginConfiguration();
         var normalizedQuery = CastCrewActorQueryNormalizer.Normalize(query, configuration);
+        _mappingService.EnsureMappingBuilt();
+
+        var availableLibraries = _mappingService
+            .GetMappedLibraries()
+            .Select(library => new CastCrewLibraryOption
+            {
+                Id = library.Id,
+                Name = library.Name
+            })
+            .ToArray();
+        var libraryMappingLastSyncedUtc = NormalizeMappingSyncTime(_mappingService.LastBuildTime);
+
+        var effectiveLibraryIds = ResolveEffectiveLibraryIds(
+            configuration.IncludedLibraryIds,
+            normalizedQuery.RequestedLibraryIds);
+
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Querying {PersonType}. SearchTerm={SearchTerm}, StartIndex={StartIndex}, Limit={Limit}, EffectiveLibraryFilter={LibraryFilterCount}.",
+            personType,
+            normalizedQuery.SearchTerm ?? "(none)",
+            normalizedQuery.StartIndex,
+            normalizedQuery.Limit,
+            effectiveLibraryIds.Length);
 
         var dtoOptions = new DtoOptions
         {
@@ -62,7 +93,14 @@ public sealed class CastCrewActorQueryService
         // When a search term is present, return grouped results (name matches + description matches)
         if (!string.IsNullOrEmpty(normalizedQuery.SearchTerm))
         {
-            return QueryPersonsGrouped(normalizedQuery, user, personType, dtoOptions, configuration);
+            return QueryPersonsGrouped(
+                normalizedQuery,
+                user,
+                personType,
+                dtoOptions,
+                effectiveLibraryIds,
+                availableLibraries,
+                libraryMappingLastSyncedUtc);
         }
 
         // No search term: return flat list with pagination (existing behavior)
@@ -82,7 +120,7 @@ public sealed class CastCrewActorQueryService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[CastCrew] Failed to query {personType.ToLowerInvariant()}s: {ex.Message}");
+            _logger.LogError(ex, "[CastCrew] Failed to query {PersonType} items.", personType);
             return new CastCrewActorsResponse
             {
                 Items = Array.Empty<MediaBrowser.Model.Dto.BaseItemDto>(),
@@ -92,13 +130,21 @@ public sealed class CastCrewActorQueryService
                 SortBy = normalizedQuery.SortBy,
                 DetailRoutePreference = normalizedQuery.DetailRoutePreference,
                 AvailableTags = Array.Empty<string>(),
-                AvailableProductionLocations = Array.Empty<string>()
+                AvailableProductionLocations = Array.Empty<string>(),
+                AvailableLibraries = availableLibraries,
+                LibraryMappingLastSyncedUtc = libraryMappingLastSyncedUtc
             };
         }
 
         // Apply library filter
-        var includedLibraryIds = configuration.IncludedLibraryIds;
-        var libraryFilteredPersons = ApplyLibraryFilter(allPersons, includedLibraryIds);
+        var libraryFilteredPersons = ApplyLibraryFilter(allPersons, effectiveLibraryIds);
+
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Filtered {PersonType} results by libraries: {BeforeCount} -> {AfterCount}.",
+            personType,
+            allPersons.Count,
+            libraryFilteredPersons.Count);
 
         var availableTags = GetAvailableFacetValues(libraryFilteredPersons, person => person.Tags);
         var availableProductionLocations = GetAvailableFacetValues(
@@ -126,7 +172,9 @@ public sealed class CastCrewActorQueryService
             SortBy = normalizedQuery.SortBy,
             DetailRoutePreference = normalizedQuery.DetailRoutePreference,
             AvailableTags = availableTags,
-            AvailableProductionLocations = availableProductionLocations
+            AvailableProductionLocations = availableProductionLocations,
+            AvailableLibraries = availableLibraries,
+            LibraryMappingLastSyncedUtc = libraryMappingLastSyncedUtc
         };
     }
 
@@ -139,7 +187,9 @@ public sealed class CastCrewActorQueryService
 #endif
         string personType,
         DtoOptions dtoOptions,
-        PluginConfiguration configuration)
+        IReadOnlyList<string> effectiveLibraryIds,
+        IReadOnlyList<CastCrewLibraryOption> availableLibraries,
+        DateTime? libraryMappingLastSyncedUtc)
     {
         IReadOnlyList<Person> nameMatchPersons;
         IReadOnlyList<Person> allPersons;
@@ -170,7 +220,7 @@ public sealed class CastCrewActorQueryService
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"[CastCrew] Failed to query {personType.ToLowerInvariant()}s: {ex.Message}");
+            _logger.LogError(ex, "[CastCrew] Failed to query grouped {PersonType} items.", personType);
             return new CastCrewActorsResponse
             {
                 Items = Array.Empty<MediaBrowser.Model.Dto.BaseItemDto>(),
@@ -184,14 +234,23 @@ public sealed class CastCrewActorQueryService
                 DescriptionMatchItems = Array.Empty<MediaBrowser.Model.Dto.BaseItemDto>(),
                 DescriptionMatchCount = 0,
                 AvailableTags = Array.Empty<string>(),
-                AvailableProductionLocations = Array.Empty<string>()
+                AvailableProductionLocations = Array.Empty<string>(),
+                AvailableLibraries = availableLibraries,
+                LibraryMappingLastSyncedUtc = libraryMappingLastSyncedUtc
             };
         }
 
         // Apply library filter
-        var includedLibraryIds = configuration.IncludedLibraryIds;
-        nameMatchPersons = ApplyLibraryFilter(nameMatchPersons, includedLibraryIds);
-        allPersons = ApplyLibraryFilter(allPersons, includedLibraryIds);
+        nameMatchPersons = ApplyLibraryFilter(nameMatchPersons, effectiveLibraryIds);
+        allPersons = ApplyLibraryFilter(allPersons, effectiveLibraryIds);
+
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Grouped query for {PersonType}: NameMatchesAfterLibraryFilter={NameMatchCount}, AllAfterLibraryFilter={AllCount}, EffectiveLibraryFilter={LibraryFilterCount}.",
+            personType,
+            nameMatchPersons.Count,
+            allPersons.Count,
+            effectiveLibraryIds.Count);
 
         var availableTags = GetAvailableFacetValues(allPersons, person => person.Tags);
         var availableProductionLocations = GetAvailableFacetValues(
@@ -244,13 +303,15 @@ public sealed class CastCrewActorQueryService
             DescriptionMatchItems = descMatchDtos,
             DescriptionMatchCount = sortedDescMatches.Length,
             AvailableTags = availableTags,
-            AvailableProductionLocations = availableProductionLocations
+            AvailableProductionLocations = availableProductionLocations,
+            AvailableLibraries = availableLibraries,
+            LibraryMappingLastSyncedUtc = libraryMappingLastSyncedUtc
         };
     }
 
-    private IReadOnlyList<Person> ApplyLibraryFilter(IReadOnlyList<Person> persons, string[] includedLibraryIds)
+    private IReadOnlyList<Person> ApplyLibraryFilter(IReadOnlyList<Person> persons, IReadOnlyList<string> includedLibraryIds)
     {
-        if (includedLibraryIds is null || includedLibraryIds.Length == 0)
+        if (includedLibraryIds is null || includedLibraryIds.Count == 0)
         {
             return persons;
         }
@@ -260,6 +321,48 @@ public sealed class CastCrewActorQueryService
         return persons
             .Where(person => _mappingService.IsPersonInLibraries(person.Name, includedLibraryIds))
             .ToList();
+    }
+
+    private static string[] ResolveEffectiveLibraryIds(
+        IReadOnlyList<string>? configuredLibraryIds,
+        IReadOnlyList<string>? requestedLibraryIds)
+    {
+        var normalizedConfigured = (configuredLibraryIds ?? Array.Empty<string>())
+            .Select(CastCrewLibraryIdNormalizer.NormalizeLibraryId)
+            .Where(id => id.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var normalizedRequested = (requestedLibraryIds ?? Array.Empty<string>())
+            .Select(CastCrewLibraryIdNormalizer.NormalizeLibraryId)
+            .Where(id => id.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (normalizedRequested.Length == 0)
+        {
+            return normalizedConfigured;
+        }
+
+        if (normalizedConfigured.Length == 0)
+        {
+            return normalizedRequested;
+        }
+
+        var configuredSet = normalizedConfigured.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return normalizedRequested
+            .Where(configuredSet.Contains)
+            .ToArray();
+    }
+
+    private static DateTime? NormalizeMappingSyncTime(DateTime timestamp)
+    {
+        if (timestamp == DateTime.MinValue)
+        {
+            return null;
+        }
+
+        return DateTime.SpecifyKind(timestamp, DateTimeKind.Utc);
     }
 
     private static IEnumerable<Person> ApplyFacetFilters(

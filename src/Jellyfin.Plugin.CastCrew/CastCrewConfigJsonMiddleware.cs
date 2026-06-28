@@ -48,14 +48,23 @@ internal sealed class CastCrewConfigJsonMiddleware
         var configuration = CastCrewPlugin.Instance?.Configuration;
         if (configuration is null || !configuration.EnableCastCrewMainMenuEntry)
         {
+            CastCrewDebugLogging.LogInformation(
+                _logger,
+                "Skipping config.json middleware injection because CastCrew main menu entry is disabled.");
             await _next(context);
             return;
         }
+
+        CastCrewDebugLogging.LogInformation(_logger, "Intercepting /web/config.json request for CastCrew menu-link injection.");
 
         // Read the original config.json from the web root
         var configFilePath = Path.Combine(_applicationPaths.WebPath, "config.json");
         if (!File.Exists(configFilePath))
         {
+            CastCrewDebugLogging.LogInformation(
+                _logger,
+                "Skipping config.json injection because file was not found at '{ConfigPath}'.",
+                configFilePath);
             await _next(context);
             return;
         }
@@ -103,6 +112,11 @@ internal sealed class CastCrewConfigJsonMiddleware
                     ["icon"] = CastCrewLinkIcon,
                     ["url"] = CastCrewLinkUrl
                 });
+                CastCrewDebugLogging.LogInformation(_logger, "Injected CastCrew menu link into middleware-served config.json.");
+            }
+            else
+            {
+                CastCrewDebugLogging.LogInformation(_logger, "CastCrew menu link already present in config.json response.");
             }
 
             // Serve the modified config.json with no-cache to prevent browser disk cache

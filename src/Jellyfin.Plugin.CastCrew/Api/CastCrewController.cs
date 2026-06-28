@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Jellyfin.Plugin.CastCrew.Services;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
@@ -45,6 +44,11 @@ public sealed class CastCrewController : ControllerBase
         var version = plugin?.Version?.ToString() ?? "unknown";
         var description = plugin?.Description ?? "Adds a Cast & Crew module to the Jellyfin sidebar for browsing actors, directors, producers, and other crew members.";
 
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Serving CastCrew manifest metadata. Version={Version}.",
+            version);
+
         var manifest = new[]
         {
             new
@@ -82,6 +86,11 @@ public sealed class CastCrewController : ControllerBase
     public ActionResult GetLibraries()
     {
         var libraries = _mappingService.GetAvailableLibraries();
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Listing available libraries for configuration. Count={Count}.",
+            libraries.Count);
+
         var result = new List<object>();
         foreach (var lib in libraries)
         {
@@ -98,6 +107,12 @@ public sealed class CastCrewController : ControllerBase
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public ActionResult RefreshLibraryMapping([FromQuery] string? reason = null)
     {
+        var refreshReason = string.IsNullOrWhiteSpace(reason) ? "manual/api" : reason.Trim();
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Received person-to-library mapping refresh request. Reason={Reason}.",
+            refreshReason);
+
         var configuration = CastCrewPlugin.Instance?.Configuration;
         if (configuration?.EnableDebugLogging == true)
         {
@@ -105,7 +120,6 @@ public sealed class CastCrewController : ControllerBase
             var includedLabel = includedLibraryIds.Length == 0
                 ? "(none configured; all libraries included)"
                 : string.Join(", ", includedLibraryIds);
-            var refreshReason = string.IsNullOrWhiteSpace(reason) ? "manual/api" : reason.Trim();
 
             if (refreshReason.Equals("settings-save", StringComparison.OrdinalIgnoreCase))
             {
@@ -119,6 +133,11 @@ public sealed class CastCrewController : ControllerBase
         }
 
         _mappingService.RebuildMapping();
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Person-to-library mapping refresh finished. LastBuildTimeUtc={LastBuildTimeUtc}.",
+            _mappingService.LastBuildTime);
+
         return NoContent();
     }
 
@@ -130,8 +149,17 @@ public sealed class CastCrewController : ControllerBase
         var user = GetAuthenticatedUser(query.UserId);
         if (user is null)
         {
+            CastCrewDebugLogging.LogInformation(_logger, "Actors query rejected: no authenticated user context.");
             return Unauthorized();
         }
+
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Actors query accepted. StartIndex={StartIndex}, Limit={Limit}, SearchTerm={SearchTerm}, LibraryIds={LibraryIds}.",
+            query.StartIndex ?? 0,
+            query.Limit ?? 0,
+            string.IsNullOrWhiteSpace(query.SearchTerm) ? "(none)" : query.SearchTerm.Trim(),
+            string.IsNullOrWhiteSpace(query.LibraryIds) ? "(all)" : query.LibraryIds.Trim());
 
         var response = _actorQueryService.QueryActors(query, user);
         return Ok(response);
@@ -145,8 +173,17 @@ public sealed class CastCrewController : ControllerBase
         var user = GetAuthenticatedUser(query.UserId);
         if (user is null)
         {
+            CastCrewDebugLogging.LogInformation(_logger, "Directors query rejected: no authenticated user context.");
             return Unauthorized();
         }
+
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Directors query accepted. StartIndex={StartIndex}, Limit={Limit}, SearchTerm={SearchTerm}, LibraryIds={LibraryIds}.",
+            query.StartIndex ?? 0,
+            query.Limit ?? 0,
+            string.IsNullOrWhiteSpace(query.SearchTerm) ? "(none)" : query.SearchTerm.Trim(),
+            string.IsNullOrWhiteSpace(query.LibraryIds) ? "(all)" : query.LibraryIds.Trim());
 
         var response = _actorQueryService.QueryDirectors(query, user);
         return Ok(response);
@@ -160,8 +197,17 @@ public sealed class CastCrewController : ControllerBase
         var user = GetAuthenticatedUser(query.UserId);
         if (user is null)
         {
+            CastCrewDebugLogging.LogInformation(_logger, "Producers query rejected: no authenticated user context.");
             return Unauthorized();
         }
+
+        CastCrewDebugLogging.LogInformation(
+            _logger,
+            "Producers query accepted. StartIndex={StartIndex}, Limit={Limit}, SearchTerm={SearchTerm}, LibraryIds={LibraryIds}.",
+            query.StartIndex ?? 0,
+            query.Limit ?? 0,
+            string.IsNullOrWhiteSpace(query.SearchTerm) ? "(none)" : query.SearchTerm.Trim(),
+            string.IsNullOrWhiteSpace(query.LibraryIds) ? "(all)" : query.LibraryIds.Trim());
 
         var response = _actorQueryService.QueryProducers(query, user);
         return Ok(response);
@@ -178,9 +224,11 @@ public sealed class CastCrewController : ControllerBase
 
         if (effectiveUserId is null)
         {
+            CastCrewDebugLogging.LogInformation(_logger, "Unable to resolve authenticated user id from claims/query.");
             return null;
         }
 
+        CastCrewDebugLogging.LogInformation(_logger, "Resolved authenticated user context for CastCrew query.");
         return _userManager.GetUserById(effectiveUserId.Value);
     }
 

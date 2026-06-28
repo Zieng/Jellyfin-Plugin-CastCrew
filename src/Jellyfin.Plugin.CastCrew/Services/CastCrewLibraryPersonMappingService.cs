@@ -25,6 +25,7 @@ public sealed class CastCrewLibraryPersonMappingService
 
     // personName (case-insensitive key) → set of library ItemIds (as strings)
     private Dictionary<string, HashSet<string>> _personLibraryMap = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, string> _mappedLibraryNames = new(StringComparer.OrdinalIgnoreCase);
     private DateTime _lastBuildTime = DateTime.MinValue;
     private CancellationTokenSource? _scheduledRebuildCancellation;
 
@@ -50,7 +51,7 @@ public sealed class CastCrewLibraryPersonMappingService
     {
         lock (_rebuildLock)
         {
-            var debugLoggingEnabled = IsDebugLoggingEnabled();
+            var debugLoggingEnabled = CastCrewDebugLogging.IsEnabled();
 
             _logger.LogInformation("[CastCrew] Building person-to-library mapping...");
             if (debugLoggingEnabled)
@@ -60,12 +61,13 @@ public sealed class CastCrewLibraryPersonMappingService
 
             var newMap = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var debugLibraryStats = new Dictionary<string, (int MoviesScanned, HashSet<string> PersonNames)>(StringComparer.OrdinalIgnoreCase);
+            var mappedLibraryNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             try
             {
                 var configuration = CastCrewPlugin.Instance?.Configuration;
                 var configuredIncludedLibraryIds = (configuration?.IncludedLibraryIds ?? Array.Empty<string>())
-                    .Select(NormalizeLibraryId)
+                    .Select(CastCrewLibraryIdNormalizer.NormalizeLibraryId)
                     .Where(id => id.Length > 0)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -76,7 +78,7 @@ public sealed class CastCrewLibraryPersonMappingService
                     virtualFolders
                         .Select(f =>
                         {
-                            var id = NormalizeLibraryId(f.ItemId);
+                            var id = CastCrewLibraryIdNormalizer.NormalizeLibraryId(f.ItemId);
                             if (id.Length > 0)
                             {
                                 libraryNameById[id] = string.IsNullOrWhiteSpace(f.Name) ? id : f.Name;
@@ -100,6 +102,7 @@ public sealed class CastCrewLibraryPersonMappingService
                     lock (_lock)
                     {
                         _personLibraryMap = newMap;
+                        _mappedLibraryNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                         _lastBuildTime = DateTime.UtcNow;
                     }
 
@@ -150,7 +153,7 @@ public sealed class CastCrewLibraryPersonMappingService
                     var itemLibraryIds = new List<string>();
                     foreach (var folder in collectionFolders)
                     {
-                        var folderId = NormalizeLibraryId(folder.Id.ToString("N"));
+                        var folderId = CastCrewLibraryIdNormalizer.NormalizeLibraryId(folder.Id.ToString("N"));
                         if (folderId.Length > 0 && libraryIdSet.Contains(folderId))
                         {
                             itemLibraryIds.Add(folderId);
@@ -248,6 +251,12 @@ public sealed class CastCrewLibraryPersonMappingService
                             personCount);
                     }
                 }
+
+                mappedLibraryNames = libraryIdSet
+                    .ToDictionary(
+                        libraryId => libraryId,
+                        libraryId => ResolveLibraryName(libraryId, libraryNameById),
+                        StringComparer.OrdinalIgnoreCase);
             }
             catch (Exception ex)
             {
@@ -258,6 +267,7 @@ public sealed class CastCrewLibraryPersonMappingService
             lock (_lock)
             {
                 _personLibraryMap = newMap;
+                _mappedLibraryNames = mappedLibraryNames;
                 _lastBuildTime = DateTime.UtcNow;
             }
 
@@ -272,9 +282,11 @@ public sealed class CastCrewLibraryPersonMappingService
     {
         if (LastBuildTime != DateTime.MinValue)
         {
+            CastCrewDebugLogging.LogInformation(_logger, "Mapping already initialized at {LastBuildTimeUtc}.", LastBuildTime);
             return;
         }
 
+        CastCrewDebugLogging.LogInformation(_logger, "Mapping not initialized yet; rebuilding immediately.");
         RebuildMapping();
     }
 
@@ -286,7 +298,7 @@ public sealed class CastCrewLibraryPersonMappingService
     public void QueueRebuild(string reason, TimeSpan? debounceDelay = null)
     {
         var delay = debounceDelay.GetValueOrDefault(DefaultRebuildDebounceDelay);
-        var debugLoggingEnabled = IsDebugLoggingEnabled();
+        var debugLoggingEnabled = CastCrewDebugLogging.IsEnabled();
 
         CancellationTokenSource scheduledCts;
         lock (_rebuildScheduleLock)
@@ -444,7 +456,7 @@ public sealed class CastCrewLibraryPersonMappingService
         }
 
         var normalizedIncludedLibraryIds = includedLibraryIds
-            .Select(NormalizeLibraryId)
+            .Select(CastCrewLibraryIdNormalizer.NormalizeLibraryId)
             .Where(id => id.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -480,6 +492,29 @@ public sealed class CastCrewLibraryPersonMappingService
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Gets the set of libraries included in the latest mapping build.
+    /// </summary>
+    public IReadOnlyList<(string Id, string Name)> GetMappedLibraries()
+    {
+        Dictionary<string, string> mappedLibraryNames;
+        lock (_lock)
+        {
+            mappedLibraryNames = _mappedLibraryNames;
+        }
+
+        if (mappedLibraryNames.Count == 0)
+        {
+            return Array.Empty<(string Id, string Name)>();
+        }
+
+        return mappedLibraryNames
+            .Select(entry => (entry.Key, entry.Value))
+            .OrderBy(entry => entry.Value, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(entry => entry.Key, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     /// <summary>
@@ -522,27 +557,6 @@ public sealed class CastCrewLibraryPersonMappingService
         return libraryId;
     }
 
-    private static bool IsDebugLoggingEnabled()
-    {
-        return CastCrewPlugin.Instance?.Configuration?.EnableDebugLogging == true;
-    }
-
-    private static string NormalizeLibraryId(string? libraryId)
-    {
-        if (string.IsNullOrWhiteSpace(libraryId))
-        {
-            return string.Empty;
-        }
-
-        var trimmed = libraryId.Trim();
-        if (Guid.TryParse(trimmed, out var parsedId))
-        {
-            return parsedId.ToString("N");
-        }
-
-        return trimmed;
-    }
-
     /// <summary>
     /// Gets all available virtual folders (libraries) from Jellyfin.
     /// Returns tuples of (Id, Name, CollectionType).
@@ -560,6 +574,8 @@ public sealed class CastCrewLibraryPersonMappingService
                     result.Add((f.ItemId, f.Name ?? "Unknown", f.CollectionType?.ToString() ?? ""));
                 }
             }
+
+            CastCrewDebugLogging.LogInformation(_logger, "Resolved {LibraryCount} virtual folders for configuration.", result.Count);
             return result;
         }
         catch (Exception ex)

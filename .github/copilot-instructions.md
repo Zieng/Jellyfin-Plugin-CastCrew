@@ -16,7 +16,16 @@ The plugin and test projects multi-target `net8.0` (Jellyfin 10.10.x) and `net9.
 
 ## Local integration testing and cleanup
 
-The developer runs a local Jellyfin instance (see `local_jellyfin_credentials.tmp` for credentials). When performing integration tests that require starting/restarting Jellyfin:
+The developer may run both a local native Jellyfin instance and a local Docker Jellyfin instance (see `local_jellyfin_credentials.tmp` for credentials).
+
+**Verification order (default behavior)**
+
+Unless the user explicitly asks for Docker-only verification:
+1. Verify on the local native Jellyfin instance first (typically `http://localhost:8096`).
+2. If native verification passes and Docker is available on the current host, run the same verification flow again on the local Docker Jellyfin instance (typically `http://localhost:8098`).
+3. If the native instance is unavailable, report it clearly and use Docker as fallback when available.
+
+When performing integration tests that require starting/restarting Jellyfin:
 
 **CRITICAL: Environment cleanup after testing**
 

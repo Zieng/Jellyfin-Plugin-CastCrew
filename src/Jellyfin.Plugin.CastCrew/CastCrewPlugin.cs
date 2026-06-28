@@ -23,6 +23,12 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
             null,
             static message => Console.Error.WriteLine("[CastCrew] " + message));
         Instance = this;
+
+        CastCrewDebugLogging.LogInformation(
+            logger: null,
+            "CastCrewPlugin initialized. Version={0}, WebPath='{1}'.",
+            Version,
+            _applicationPaths.WebPath);
     }
 
     public override Guid Id => Guid.Parse("a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a");
@@ -35,6 +41,11 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
     {
         var prefix = GetType().Namespace;
         var configuration = Configuration ?? new PluginConfiguration();
+
+        CastCrewDebugLogging.LogInformation(
+            logger: null,
+            "Building plugin page registration. EnableCastCrewMainMenuEntry={0}.",
+            configuration.EnableCastCrewMainMenuEntry);
 
         // Attempt to sync menu link to web root (works when web root is writable).
         // When read-only (Docker, installer-based), the CastCrewConfigJsonMiddleware
