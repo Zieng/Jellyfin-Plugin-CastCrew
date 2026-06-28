@@ -67,7 +67,7 @@ When making changes to architecture/workflow conventions, keep these locations i
 - Key plugin config values: `DefaultPageSize`, `DefaultSortBy`, `EnableCastCrewMainMenuEntry`, `EnableDebugLogging`, `DetailRoutePreference`.
 - CastCrew sidebar/top-banner auto-sync requires writable Jellyfin web assets (`/web/config.json` and `/web/index.html` updates). Windows installer runs that hit read-only `Program Files` web roots bootstrap `%LOCALAPPDATA%\Jellyfin\custom-web`, set user `JELLYFIN_WEB_DIR`, and refresh running Jellyfin tray launcher context for subsequent tray restarts; other hosts still need a writable `--webdir`.
 - Integration tests are opt-in (`CASTCREW_RUN_INTEGRATION_TESTS=true`) and require a live Jellyfin host plus credentials.
-- Packaging/release automation is implemented in `.github/workflows/package-plugin.yml`, producing `CastCrew_<Version>.zip` artifacts from release builds. The workflow runs on `ubuntu-latest`, but the produced package is host-platform agnostic for Jellyfin Linux/Windows/macOS.
+- Packaging/release automation is implemented in `.github/workflows/package-plugin.yml`, producing `CastCrew_<Version>.zip` artifacts from release builds and a merged `manifest.json` that preserves historical versions. The workflow runs on `ubuntu-latest`, but the produced package is host-platform agnostic for Jellyfin Linux/Windows/macOS.
 - `DESIGN.md` is the canonical implementation baseline and milestone source for this plugin.
 
 ## Key conventions specific to this codebase

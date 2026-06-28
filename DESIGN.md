@@ -266,8 +266,9 @@ Jellyfin starts
 Workflow: `.github/workflows/package-plugin.yml`
 
 - **Trigger:** Tag push (`v*`) or manual dispatch
-- **Steps:** Restore → Build → Unit tests → Integration tests (Docker excluded) → Publish → Zip → Checksum → Manifest → Upload artifacts → GitHub Release + Pages deploy
+- **Steps:** Restore → Build → Unit tests → Integration tests (Docker excluded) → Publish → Zip → Checksum → Existing manifest fetch → Manifest merge (dedupe by version + ABI) → Upload artifacts → GitHub Release + Pages deploy
 - **Outputs:** `CastCrew_<version>_jellyfin-10.10.zip`, `CastCrew_<version>_jellyfin-10.11.zip`, `manifest.json`
+- **Release history:** Pages deployment keeps existing files, and manifest generation merges current release entries into prior versions so catalog history is preserved.
 - **Version:** Derived from git tag (strips `v` prefix) in CI; local non-GitHub builds default to timestamped `0.1.yyDDD.HHmm`
 
 ---

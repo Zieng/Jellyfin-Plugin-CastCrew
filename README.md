@@ -25,6 +25,7 @@ A Jellyfin plugin that adds a **Cast & Crew** page to the sidebar for browsing a
 4. Restart Jellyfin.
 
 Jellyfin will automatically select the correct version for your server (10.10.x or 10.11.x).
+The plugin repository manifest keeps historical releases, so previous CastCrew versions remain visible in Jellyfin's plugin catalog.
 
 ### Manual Installation
 

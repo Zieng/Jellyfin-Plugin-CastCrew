@@ -114,45 +114,127 @@ jobs:
           echo "md5_10_10=$md5_10_10" >> "$GITHUB_OUTPUT"
           echo "md5_10_11=$md5_10_11" >> "$GITHUB_OUTPUT"
 
+      - name: Fetch existing deployed manifest (if any)
+        shell: bash
+        run: |
+          set -euo pipefail
+          pages_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          manifest_url="${pages_url}/manifest.json"
+          set +e
+          http_status=$(curl --silent --show-error --location --output artifacts/existing-manifest.json --write-out "%{http_code}" "$manifest_url")
+          curl_exit=$?
+          set -e
+          if [[ $curl_exit -ne 0 ]]; then
+            echo "ERROR: Failed to fetch existing manifest from ${manifest_url} (curl exit ${curl_exit})." >&2
+            exit 1
+          fi
+          if [[ "$http_status" == "200" ]]; then
+            echo "Found existing manifest at ${manifest_url}"
+          elif [[ "$http_status" == "404" ]]; then
+            echo "No existing manifest found at ${manifest_url} (first release or Pages not initialized yet)."
+            rm -f artifacts/existing-manifest.json
+          else
+            echo "ERROR: Unexpected HTTP status ${http_status} while fetching ${manifest_url}." >&2
+            exit 1
+          fi
+
       - name: Generate plugin repository manifest
         shell: bash
         run: |
           set -euo pipefail
-          version="${{ steps.version.outputs.value }}"
-          pages_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
-          timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          changelog="Add person-library filtering, improve Cast & Crew settings UX, and add optional debug mapping logs."
-          cat > artifacts/manifest.json << EOF
-          [
-            {
-              "guid": "a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a",
-              "name": "CastCrew",
-              "description": "Adds a Cast & Crew module to the Jellyfin sidebar for browsing actors, directors, producers, and other crew members.",
-              "overview": "Browse actors, directors, and producers in a dedicated Cast & Crew page within Jellyfin Web.",
-              "owner": "Zieng",
-              "category": "General",
-              "imageUrl": "https://github.com/${{ github.repository }}/raw/main/docs/images/logo.png",
-              "versions": [
-                {
-                  "version": "${version}",
-                  "changelog": "Target ABI 10.11.x: ${changelog}",
+          VERSION="${{ steps.version.outputs.value }}"
+          PAGES_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          CHANGELOG="Preserve release history in manifest deployment so previous versions remain visible in Jellyfin catalog."
+          ZIP_10_11="${{ steps.version.outputs.zip_10_11 }}"
+          ZIP_10_10="${{ steps.version.outputs.zip_10_10 }}"
+          MD5_10_11="${{ steps.checksum.outputs.md5_10_11 }}"
+          MD5_10_10="${{ steps.checksum.outputs.md5_10_10 }}"
+          export VERSION PAGES_URL TIMESTAMP CHANGELOG ZIP_10_11 ZIP_10_10 MD5_10_11 MD5_10_10
+
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          existing_manifest_path = pathlib.Path("artifacts/existing-manifest.json")
+          existing_versions = []
+          if existing_manifest_path.exists():
+              try:
+                  existing_manifest = json.loads(existing_manifest_path.read_text(encoding="utf-8"))
+              except json.JSONDecodeError as exc:
+                  print(f"ERROR: Unable to parse existing manifest JSON: {exc}", file=sys.stderr)
+                  sys.exit(1)
+
+              if not isinstance(existing_manifest, list) or not existing_manifest:
+                  print("ERROR: Existing manifest root must be a non-empty array.", file=sys.stderr)
+                  sys.exit(1)
+
+              versions = existing_manifest[0].get("versions")
+              if not isinstance(versions, list):
+                  print("ERROR: Existing manifest versions field must be an array.", file=sys.stderr)
+                  sys.exit(1)
+              existing_versions = versions
+
+          version = os.environ["VERSION"]
+          pages_url = os.environ["PAGES_URL"]
+          timestamp = os.environ["TIMESTAMP"]
+          changelog = os.environ["CHANGELOG"]
+
+          new_versions = [
+              {
+                  "version": version,
+                  "changelog": f"Target ABI 10.11.x: {changelog}",
                   "targetAbi": "10.11.0.0",
-                  "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_11 }}",
-                  "checksum": "${{ steps.checksum.outputs.md5_10_11 }}",
-                  "timestamp": "${timestamp}"
-                },
-                {
-                  "version": "${version}",
-                  "changelog": "Target ABI 10.10.x: ${changelog}",
+                  "sourceUrl": f"{pages_url}/{os.environ['ZIP_10_11']}",
+                  "checksum": os.environ["MD5_10_11"],
+                  "timestamp": timestamp,
+              },
+              {
+                  "version": version,
+                  "changelog": f"Target ABI 10.10.x: {changelog}",
                   "targetAbi": "10.10.0.0",
-                  "sourceUrl": "${pages_url}/${{ steps.version.outputs.zip_10_10 }}",
-                  "checksum": "${{ steps.checksum.outputs.md5_10_10 }}",
-                  "timestamp": "${timestamp}"
-                }
-              ]
-            }
+                  "sourceUrl": f"{pages_url}/{os.environ['ZIP_10_10']}",
+                  "checksum": os.environ["MD5_10_10"],
+                  "timestamp": timestamp,
+              },
           ]
-          EOF
+
+          merged_versions = []
+          seen = set()
+          for entry in [*new_versions, *existing_versions]:
+              if not isinstance(entry, dict):
+                  print("ERROR: Manifest version entries must be objects.", file=sys.stderr)
+                  sys.exit(1)
+              entry_version = entry.get("version")
+              entry_abi = entry.get("targetAbi")
+              if not entry_version or not entry_abi:
+                  print("ERROR: Manifest version entry is missing version or targetAbi.", file=sys.stderr)
+                  sys.exit(1)
+              key = (entry_version, entry_abi)
+              if key in seen:
+                  continue
+              seen.add(key)
+              merged_versions.append(entry)
+
+          manifest = [
+              {
+                  "guid": "a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a",
+                  "name": "CastCrew",
+                  "description": "Adds a Cast & Crew module to the Jellyfin sidebar for browsing actors, directors, producers, and other crew members.",
+                  "overview": "Browse actors, directors, and producers in a dedicated Cast & Crew page within Jellyfin Web.",
+                  "owner": "Zieng",
+                  "category": "General",
+                  "imageUrl": "https://github.com/${{ github.repository }}/raw/main/docs/images/logo.png",
+                  "versions": merged_versions,
+              }
+          ]
+
+          output_path = pathlib.Path("artifacts/manifest.json")
+          output_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          PY
+
           echo "Generated manifest.json:"
           cat artifacts/manifest.json
 
@@ -169,9 +251,52 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          version="${{ steps.version.outputs.value }}"
           echo "Verifying manifest checksums against actual zip files..."
-          manifest_md5_10_11=$(python3 -c "import json; m=json.load(open('pages/manifest.json')); print([v['checksum'] for v in m[0]['versions'] if '10.11' in v['targetAbi']][0])")
-          manifest_md5_10_10=$(python3 -c "import json; m=json.load(open('pages/manifest.json')); print([v['checksum'] for v in m[0]['versions'] if '10.10' in v['targetAbi']][0])")
+          manifest_md5_10_11=$(TARGET_ABI="10.11.0.0" TARGET_VERSION="$version" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          with open("pages/manifest.json", encoding="utf-8") as f:
+              manifest = json.load(f)
+          versions = manifest[0].get("versions", [])
+          matches = [
+              entry.get("checksum")
+              for entry in versions
+              if entry.get("targetAbi") == os.environ["TARGET_ABI"]
+              and entry.get("version") == os.environ["TARGET_VERSION"]
+          ]
+          if not matches or not matches[0]:
+              print(
+                  f"ERROR: Missing manifest checksum for version={os.environ['TARGET_VERSION']} targetAbi={os.environ['TARGET_ABI']}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(matches[0])
+          PY
+          )
+          manifest_md5_10_10=$(TARGET_ABI="10.10.0.0" TARGET_VERSION="$version" python3 - <<'PY'
+          import json
+          import os
+          import sys
+          with open("pages/manifest.json", encoding="utf-8") as f:
+              manifest = json.load(f)
+          versions = manifest[0].get("versions", [])
+          matches = [
+              entry.get("checksum")
+              for entry in versions
+              if entry.get("targetAbi") == os.environ["TARGET_ABI"]
+              and entry.get("version") == os.environ["TARGET_VERSION"]
+          ]
+          if not matches or not matches[0]:
+              print(
+                  f"ERROR: Missing manifest checksum for version={os.environ['TARGET_VERSION']} targetAbi={os.environ['TARGET_ABI']}",
+                  file=sys.stderr,
+              )
+              sys.exit(1)
+          print(matches[0])
+          PY
+          )
           actual_md5_10_11=$(md5sum "pages/${{ steps.version.outputs.zip_10_11 }}" | awk '{print $1}')
           actual_md5_10_10=$(md5sum "pages/${{ steps.version.outputs.zip_10_10 }}" | awk '{print $1}')
           echo "  10.11 manifest=$manifest_md5_10_11 actual=$actual_md5_10_11"
@@ -208,5 +333,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./pages
-          keep_files: false
+          keep_files: true
           destination_dir: .
