@@ -50,20 +50,21 @@
                 <h3 class="sectionTitle">Media Library Filter</h3>
                 <div class="fieldDescription" style="margin-bottom: 1em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
                 <div class="folders">
-                    <div style="display:flex;align-items:center">
-                        <h1 style="margin:.5em 0">Included Libraries</h1>
-                        <button is="emby-button" id="addLibraryButton" type="button" class="fab btnAddFolder submit" title="Add Media Library">
+                    <h1 style="margin:.5em 0">Included Libraries</h1>
+                    <div class="fieldDescription" style="margin-bottom: 0.5em;">Select a media library from the list, then click + to include it.</div>
+                    <div style="display:flex;align-items:center;gap:0.5em;margin-bottom:0.75em;">
+                        <div class="selectContainer" style="margin:0;flex:1 1 auto;min-width:16rem;">
+                            <select is="emby-select" id="libraryPicker" class="emby-select-withcolor emby-select" style="min-width: 16rem; width: 100%;">
+                                <option value="">Loading media libraries...</option>
+                            </select>
+                        </div>
+                        <button is="emby-button" id="addLibraryButton" type="button" class="fab btnAddFolder submit" title="Add media library to included list">
                             <span class="material-icons add" aria-hidden="true"></span>
                         </button>
                     </div>
-                    <div class="selectContainer">
-                        <select is="emby-select" id="libraryPicker" class="emby-select-withcolor emby-select" style="min-width: 16rem;">
-                            <option value="">Loading media libraries...</option>
-                        </select>
-                    </div>
                 </div>
+                <div id="librarySelectionHint" class="fieldDescription" style="margin-bottom: 0.5em;">Libraries currently included are listed below. If none are listed, all libraries are included.</div>
                 <div id="selectedLibrariesContainer" class="paperList folderList hide" style="margin-bottom: 1em;"></div>
-                <div id="librarySelectionHint" class="fieldDescription" style="margin-bottom: 0.5em;">No media libraries selected. All libraries are included.</div>
                 <button is="emby-button" id="refreshMappingButton" type="button" class="raised button-cancel" style="margin-top: 0.5em;">
                     <span>Refresh Person-Library Mapping</span>
                 </button>
@@ -294,12 +295,13 @@
                     container.classList.add('hide');
                     container.innerHTML = '';
                     refs.librarySelectionHint.style.display = 'block';
-                    refs.librarySelectionHint.textContent = 'No media libraries selected. All libraries are included.';
+                    refs.librarySelectionHint.textContent = 'No media libraries currently included. All libraries are included.';
                     return;
                 }
 
                 container.classList.remove('hide');
-                refs.librarySelectionHint.style.display = 'none';
+                refs.librarySelectionHint.style.display = 'block';
+                refs.librarySelectionHint.textContent = 'Libraries currently included:';
 
                 var html = '';
                 for (var i = 0; i < selectedLibraryIds.length; i++) {
