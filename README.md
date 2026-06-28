@@ -1,10 +1,8 @@
 # Jellyfin-Plugin-CastCrew
 
-CastCrew is a Jellyfin plugin that provides a Cast & Crew browsing experience in Jellyfin Web with search, sorting, pagination, and person detail navigation, plus optional user-home navigation integration for a `Cast&Crew` entry near Home/Favorites.
+A Jellyfin plugin that adds a **Cast & Crew** page to the sidebar for browsing actors, directors, and producers with search, sorting, pagination, and person detail navigation.
 
 ## Screenshots
-
-I blurred the actor avators to avoid possible copyright violation.
 
 ![Cast & Crew Browse](docs/images/cast-crew-browse.png)
 
@@ -36,127 +34,73 @@ Jellyfin will automatically select the correct version for your server (10.10.x 
 2. Extract into your Jellyfin plugins directory (e.g., `<data>/plugins/CastCrew_<version>/`).
 3. Restart Jellyfin.
 
-## Current Implementation
+## Features
 
-- Server-side plugin scaffold in C# targeting Jellyfin `10.10.7` (net8.0) and `10.11.11` (net9.0) via multi-target build.
-- Plugin page registration is for admin configuration only; user-home navigation is provided through Jellyfin web `menuLinks` sync.
-- Automatic Jellyfin web `config.json` sync to add/remove a Cast&Crew navigation link.
-- Optional helper script (`castcrew-top-banner-link.js`) is synchronized into Jellyfin web to render CastCrew content inside the native home-shell route.
-- Cast&Crew navigation targets the embedded home route (`/web/#/home?tab=cast_crew`) so native Jellyfin sidebar/top-banner chrome stays intact.
-- On Windows installer hosts with read-only web roots, CastCrew bootstraps a writable `%LOCALAPPDATA%\Jellyfin\custom-web` copy and sets user `JELLYFIN_WEB_DIR` for next-start pickup.
-- `/web/cast-crew.html` remains as a compatibility URL that redirects to the embedded home route.
-- CastCrew UI entry/rendering is web-shell based; native Jellyfin clients that do not load Jellyfin Web will not show the Cast&Crew page/menu.
-- Dedicated server adapter endpoints at `GET /CastCrew/Actors`, `GET /CastCrew/Directors`, and `GET /CastCrew/Producers` for stable cast/crew query contracts.
-- Person query path aligned with Jellyfin `Persons` behavior (`InternalPeopleQuery`) so cast/crew lists populate reliably on Jellyfin 10.10.x and 10.11.x.
-- Packaging automation runs on GitHub Actions `ubuntu-latest`, and produces a platform-neutral plugin zip usable by Jellyfin on Linux, Windows, and macOS.
-- Embedded cast & crew view includes:
-  - Role tabs (`Actors`, `Directors`, `Producers`)
-  - Person card grid
-  - Search with grouped name/description matches
-  - Sorting (`Name`, `DateCreated`, `Random`) with sort order control
-  - Favorites/tag/country-region filters
-  - Pagination
-  - Loading / empty / error states
-  - Route compatibility detection and fallback strategy for person detail navigation
-  - Localization-ready UI strings (`en`, `zh`) and accessibility-focused semantics
-- Admin configuration page at `Configuration/config.html` for:
-  - Default page size
-  - Default sort mode
-  - Top-banner entry behavior
-  - Route preference override (`Auto`, `HashBang`, `Hash`)
-- Unit tests for query normalization (paging/sort/filter/route preferences) and route preference normalization.
+- **Sidebar entry** — "Cast & Crew" appears in Jellyfin's left navigation drawer
+- **Role tabs** — Switch between Actors, Directors, and Producers
+- **Search** — Filter by name with grouped name/description matches
+- **Sort & Filter** — Sort by Name, DateCreated, or Random; filter by favorites, tags, or country/region
+- **Pagination** — Browse large libraries without performance issues
+- **Person detail** — Click any person to open their native Jellyfin detail page
+- **Multi-language** — UI strings available in English and Chinese
 
-## Configuration Defaults
+## Configuration
 
-- `DefaultPageSize`: `50` (min `10`, max `200`)
-- `DefaultSortBy`: `Name` (`Name` or `DateCreated`)
-- `EnableCastCrewMainMenuEntry`: `true`
-- `DetailRoutePreference`: `Auto` (`Auto`, `HashBang`, `Hash`)
+Go to **Dashboard → Plugins → CastCrew** to configure:
 
-## Adapter API Contract
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Page Size | 50 | Number of persons per page (10–200) |
+| Sort By | Name | Default sort mode (Name or DateCreated) |
+| Main Menu Entry | Enabled | Show/hide Cast&Crew in sidebar |
+| Route Preference | Auto | Person detail navigation mode (Auto, HashBang, Hash) |
 
-- Endpoints:
-  - `GET /CastCrew/Actors`
-  - `GET /CastCrew/Directors`
-  - `GET /CastCrew/Producers`
-- Query:
-  - `startIndex`, `limit`, `searchTerm`, `sortBy`, `sortOrder`, `isFavorite`, `tag`, `productionLocation`, optional `userId`
-- Response:
-  - `Items`, `TotalRecordCount`, `StartIndex`, `PageSize`, `SortBy`, `DetailRoutePreference`
-  - `AvailableTags`, `AvailableProductionLocations`
-  - optional grouped search payload: `NameMatchItems`, `NameMatchCount`, `DescriptionMatchItems`, `DescriptionMatchCount`
+## Compatibility
 
-## Host Notes (read-only web roots)
+| Platform | Support |
+|----------|---------|
+| Jellyfin 10.10.x (net8.0) | ✅ |
+| Jellyfin 10.11.x (net9.0) | ✅ |
+| Docker (linuxserver, official) | ✅ Works out of the box |
+| Windows installer | ✅ Auto-bootstraps writable web dir |
+| macOS app bundle | ⚠️ Requires writable `--webdir` |
+| Native mobile clients | ❌ Web-only (API endpoints still available) |
 
-- Some installs use a read-only web root (for example `C:\Program Files\Jellyfin\Server\jellyfin-web` on Windows installer installs, or `/Applications/Jellyfin.app/.../jellyfin-web` on macOS app bundles).
-- On Windows installer hosts, CastCrew automatically bootstraps `%LOCALAPPDATA%\Jellyfin\custom-web` and stores it in user `JELLYFIN_WEB_DIR` when the default web root is read-only; restart Jellyfin after the first bootstrap run.
-- CastCrew also refreshes a running `Jellyfin.Windows.Tray.exe` launcher with `JELLYFIN_WEB_DIR` so tray-based server restarts pick up the writable web root.
-- If you launch Jellyfin directly from a long-lived shell process, restart from a fresh shell session (or use an explicit `--webdir` once) so the updated environment is inherited.
-- On non-Windows hosts, or if you prefer manual control, run Jellyfin with a writable `--webdir` (for example, a copied web directory under your user data path).
-- Example startup override:
-  - `jellyfin --webdir "%LOCALAPPDATA%\Jellyfin\custom-web" --datadir "%LOCALAPPDATA%\Jellyfin"`
-- Example startup override (macOS):
-  - `jellyfin --webdir "$HOME/Library/Application Support/jellyfin/custom-web" --datadir "$HOME/Library/Application Support/jellyfin"`
+### Docker
 
-## Client and Platform Limitations
+The plugin works automatically in Docker containers with read-only web roots. No additional configuration is needed — the sidebar entry is injected at the HTTP response level without modifying any files on disk.
 
-- CastCrew navigation/page rendering is implemented in Jellyfin Web (`/web/#/home?tab=cast_crew`) via web resource sync and script injection.
-- Desktop browsers and mobile browsers using Jellyfin Web are supported.
-- Native mobile clients that render their own UI (without Jellyfin Web) do not automatically expose the CastCrew menu/page.
-- CastCrew server endpoints (`/CastCrew/*`) remain available on the host even when a specific client app does not expose the plugin UI.
+### Windows Installer
 
-## Development Commands
+On Windows installs where the web root (`Program Files`) is read-only, CastCrew automatically:
+1. Copies web assets to `%LOCALAPPDATA%\Jellyfin\custom-web`
+2. Sets user-level `JELLYFIN_WEB_DIR` environment variable
+3. Refreshes the Jellyfin tray launcher
 
-- Prerequisite: .NET SDK 8+ (plugin multi-targets `net8.0` and `net9.0`; test projects set `RollForward=Major` to run on newer runtimes when needed).
-- Restore:
-  - `dotnet restore src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj`
-- Build:
-  - `dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj`
-- Run tests:
-  - `dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj`
-- Run a single test:
-  - `dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --filter "FullyQualifiedName~CastCrewActorQueryNormalizerTests"`
-- Run integration tests (requires running Jellyfin + auth):
-  - `CASTCREW_RUN_INTEGRATION_TESTS=true CASTCREW_BASE_URL=http://127.0.0.1:8096 CASTCREW_API_KEY=<your_api_key> dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj`
-- Build a release zip locally:
-  - `dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj --configuration Release --output artifacts/publish && VERSION=$(sed -n '/<Version>/{s:.*<Version>\(.*\)</Version>.*:\1:p;q;}' src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj) && mkdir -p artifacts/CastCrew_${VERSION} && cp artifacts/publish/Jellyfin.Plugin.CastCrew.dll artifacts/CastCrew_${VERSION}/ && (cd artifacts && zip -r CastCrew_${VERSION}.zip CastCrew_${VERSION})`
+Restart Jellyfin once after first install to activate.
 
-### Integration test environment variables
+### macOS App Bundle
 
-- `CASTCREW_RUN_INTEGRATION_TESTS`: set to `true` to enable integration execution.
-- `CASTCREW_BASE_URL`: Jellyfin host base URL (default `http://127.0.0.1:8096`).
-- Auth options:
-  - `CASTCREW_API_KEY` **or**
-  - `CASTCREW_USERNAME` + `CASTCREW_PASSWORD`
-- Optional:
-  - `CASTCREW_USER_ID` to force a specific user context in CastCrew endpoint queries.
+Run Jellyfin with a writable web directory:
+```
+jellyfin --webdir "$HOME/Library/Application Support/jellyfin/custom-web"
+```
 
-## Project Structure
+## Limitations
 
-- `src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj`
-- `src/Jellyfin.Plugin.CastCrew/CastCrewPlugin.cs`
-- `src/Jellyfin.Plugin.CastCrew/PluginServiceRegistrator.cs`
-- `src/Jellyfin.Plugin.CastCrew/Api/`
-- `src/Jellyfin.Plugin.CastCrew/Services/`
-- `src/Jellyfin.Plugin.CastCrew/Configuration/`
-- `src/Jellyfin.Plugin.CastCrew/Web/actors.html`
-- `src/Jellyfin.Plugin.CastCrew/Web/cast-crew-standalone.html`
-- `tests/Jellyfin.Plugin.CastCrew.Tests/`
-- `tests/Jellyfin.Plugin.CastCrew.IntegrationTests/`
+- CastCrew UI is rendered inside Jellyfin Web only. Native mobile clients (iOS/Android apps) that don't embed the web UI won't show the sidebar entry.
+- The CastCrew API endpoints (`/CastCrew/Actors`, `/CastCrew/Directors`, `/CastCrew/Producers`) remain available on all platforms regardless of UI visibility.
 
-## AI Development Support (Copilot)
+## Development
 
-- Global instructions: `.github/copilot-instructions.md`
-- Path-scoped instructions: `.github/instructions/`
-- Reusable Copilot skills: `.github/skills/`
+## Troubleshooting
 
-Key repo skills currently available:
+### No Cast&Crew in sidebar
 
-- `castcrew-feature-development`
-- `castcrew-route-compatibility`
-- `castcrew-test-runtime-compatibility`
+Open the page in a **private/incognito window**. If it appears there, your browser has cached stale data — do a hard refresh (Ctrl+Shift+R / Cmd+Shift+R) in your normal browser.
 
-## Milestone Plan Status
+> **Tip:** If you're unsure whether the plugin is working, try opening Jellyfin in a private/incognito browser window first. This bypasses all browser caches and gives you a clean test.
 
-1. Milestones A-G from `DESIGN.md` are complete.
-2. Packaging/release automation is in `.github/workflows/package-plugin.yml` and publishes `CastCrew_<Version>.zip` artifacts on tags/workflow dispatch.
+## Development
+
+For architecture details, build commands, API contracts, project structure, and contribution guidance, see **[DESIGN.md](DESIGN.md)**.

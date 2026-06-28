@@ -1,170 +1,310 @@
-# Jellyfin-Plugin-CastCrew Design Document
+# CastCrew Developer Guide
 
-Version: 2.1  
-Status: Active (Milestones A-G Complete)  
-Target Host: Jellyfin 10.10.x / 10.11.x  
-Plugin Type: Server Plugin (C#) + Hosted Web Page
+> This document is the canonical reference for developers and AI agents working on this plugin.
+> For user-facing documentation, see [README.md](README.md).
 
-## 1. Background
+## Quick Start
 
-CastCrew adds a dedicated Cast & Crew module to Jellyfin so users can browse all actors, directors, producers, and other crew members, and open person detail pages with biography and related media.
+```bash
+# Build
+dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj
 
-## 2. Product Goals
+# Run unit tests
+dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj
 
-1. Add a `Cast&Crew` entry in Jellyfin main navigation.
-2. Provide a cast & crew index page similar to media library browsing.
-3. Clicking a person opens Jellyfin native person detail page.
-4. Keep implementation compatible with Jellyfin 10.11.x plugin architecture.
+# Run Docker integration tests (requires Docker)
+dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj \
+  --filter "FullyQualifiedName~CastCrewDockerIntegrationTests"
 
-## 3. Scope
+# Deploy locally (macOS)
+dotnet publish src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj \
+  --configuration Debug --framework net8.0 --output artifacts/local
+cp artifacts/local/Jellyfin.Plugin.CastCrew.dll \
+  ~/Library/Application\ Support/jellyfin/plugins/CastCrew_0.1.0.1/
+# Then restart Jellyfin
+```
 
-### In Scope
+---
 
-1. Server-side plugin scaffold and page registration.
-2. Cast & Crew menu entry and hosted browsing page.
-3. Person list with search, sort, and pagination.
-4. Person click-to-detail navigation.
-5. Basic loading, empty, and error states.
+## Architecture Overview
 
-### Out of Scope
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Jellyfin Server (ASP.NET Core)                                 │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  CastCrew Plugin                                         │   │
+│  │                                                          │   │
+│  │  Startup:                                                │   │
+│  │    IStartupFilter → CastCrewConfigJsonMiddleware         │   │
+│  │    IHostedService → CastCrewStartupSyncHostedService     │   │
+│  │                                                          │   │
+│  │  Request Pipeline:                                       │   │
+│  │    GET /web/config.json → Middleware injects menuLinks    │   │
+│  │    GET /CastCrew/Actors → CastCrewController             │   │
+│  │    GET /CastCrew/Directors → CastCrewController          │   │
+│  │    GET /CastCrew/Producers → CastCrewController          │   │
+│  │                                                          │   │
+│  │  Services:                                               │   │
+│  │    CastCrewActorQueryService → ILibraryManager           │   │
+│  │    CastCrewActorQueryNormalizer (paging/sort/filter)      │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                 │
+│  Static Files: /web/config.json, /web/index.html, etc.          │
+└─────────────────────────────────────────────────────────────────┘
 
-1. Metadata editing for people.
-2. Scraper or metadata pipeline customization.
-3. Replacing Jellyfin native person detail page.
-4. Modifying Jellyfin core source.
-5. Native mobile-client UI integration outside Jellyfin Web.
+┌─────────────────────────────────────────────────────────────────┐
+│  Jellyfin Web Client (Browser)                                  │
+│                                                                 │
+│  1. Fetches /web/config.json → gets menuLinks with Cast&Crew    │
+│  2. Renders sidebar entry in navigation drawer                  │
+│  3. On click → navigates to /web/#/home?tab=cast_crew           │
+│  4. castcrew-top-banner-link.js renders Cast&Crew UI in shell   │
+│  5. UI calls /CastCrew/Actors etc. for data                     │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-## 4. Architecture Decision
+### Key Design Decisions
 
-The implementation uses a server plugin (C#) that hosts a web page resource.
+| Decision | Rationale |
+|----------|-----------|
+| HTTP middleware for config.json | Works on ALL platforms (Docker, Windows, macOS) without file writes |
+| File-based sync as supplement | Faster on writable roots (no middleware overhead per request) |
+| `IStartupFilter` registration | Ensures middleware runs BEFORE static file middleware |
+| Multi-target net8.0 + net9.0 | Supports Jellyfin 10.10.x and 10.11.x from a single codebase |
+| Embedded resources for web pages | No external file dependencies; works in any plugin directory |
+| `InternalPeopleQuery` for data | Only reliable person query path across Jellyfin 10.10/10.11 |
 
-Rationale:
+---
 
-1. Aligns with existing local plugin references.
-2. More stable main menu integration via `IHasWebPages` and `PluginPageInfo`.
-3. Better long-term compatibility than pure web-injection-only approach.
+## Project Structure
 
-## 5. Functional Design
+```
+src/Jellyfin.Plugin.CastCrew/
+├── Jellyfin.Plugin.CastCrew.csproj    # Multi-target net8.0;net9.0
+├── CastCrewPlugin.cs                   # Entry point: BasePlugin + IHasWebPages
+├── PluginServiceRegistrator.cs         # DI registration: services + IStartupFilter
+├── CastCrewConfigJsonMiddleware.cs     # Middleware: injects menuLinks into config.json
+├── CastCrewWebConfigPatcher.cs         # File-based: writes config.json when writable
+├── CastCrewStartupSyncHostedService.cs # IHostedService: runs file sync on startup
+├── CastCrewPluginManifestCompatibility.cs # Workaround for read-only plugin manifests
+├── Api/
+│   ├── CastCrewController.cs           # HTTP endpoints: /CastCrew/{Actors,Directors,Producers}
+│   ├── CastCrewActorsQuery.cs          # Request model
+│   └── CastCrewActorsResponse.cs       # Response model
+├── Services/
+│   ├── CastCrewActorQueryService.cs    # Query logic: ILibraryManager + IDtoService
+│   └── CastCrewActorQueryNormalizer.cs # Normalization: paging, sort, filter bounds
+├── Configuration/
+│   ├── PluginConfiguration.cs          # Config model with defaults
+│   └── config.html                     # Admin configuration page (embedded)
+└── Web/
+    ├── actors.html                     # Main Cast & Crew browse UI (vanilla JS)
+    ├── cast-crew-standalone.html       # Legacy compatibility redirect
+    └── castcrew-top-banner-link.js     # Renders Cast&Crew inside Jellyfin home shell
 
-### 5.1 Navigation
+tests/
+├── Jellyfin.Plugin.CastCrew.Tests/            # Unit tests (xUnit, net8.0+net9.0)
+├── Jellyfin.Plugin.CastCrew.IntegrationTests/ # Docker + live-host tests
+└── docker/                                     # Manual Docker test environment
+```
 
-1. Plugin synchronizes Jellyfin web `config.json` `menuLinks` to provide a `Cast&Crew` navigation link.
-2. Plugin synchronizes a helper script into Jellyfin web (`castcrew-top-banner-link.js`) to render CastCrew content inside the native home-shell content area.
-3. The primary Cast&Crew entry points to `/web/#/home?tab=cast_crew`.
-4. Plugin synchronizes `/web/cast-crew.html` as a compatibility redirect to the embedded home-shell route.
-5. On Windows read-only web roots, plugin bootstraps `%LOCALAPPDATA%\Jellyfin\custom-web`, writes user `JELLYFIN_WEB_DIR`, and refreshes running Jellyfin tray launcher context so tray restarts inherit the writable web path.
-6. Menu icon target is person.
+---
 
-### 5.2 Cast & Crew Page Behavior
+## How Things Connect
 
-1. Load cast/crew persons via CastCrew server adapter endpoints (`/CastCrew/Actors`, `/CastCrew/Directors`, `/CastCrew/Producers`) based on active role tab.
-2. Support query controls:
-   - Search by person name.
-   - Sort by Name, DateCreated, or Random with ascending/descending controls.
-   - Filter by favorites, tags, and country/region.
-   - Pagination with previous/next.
-3. Render person cards with image, name, and biography snippet inside Jellyfin home-shell content area.
-4. On click, navigate to native Jellyfin details route using fallback strategy.
+### Sidebar Entry Injection (the critical path)
 
-### 5.3 Data Contract (Current)
+**Writable web root** (standard Linux/macOS installs):
+1. `CastCrewStartupSyncHostedService.StartAsync()` calls `CastCrewWebConfigPatcher.SyncCastCrewMenuLink()`
+2. Patcher reads `/web/config.json`, adds menuLink, writes back
+3. Patcher injects `<script>` tag into `/web/index.html` for the home-shell renderer
+4. Static file middleware serves the modified files directly
 
-1. Source endpoints:
-   - `CastCrew/Actors`
-   - `CastCrew/Directors`
-   - `CastCrew/Producers`
-2. Query fields:
-   - `startIndex`, `limit`
-   - `searchTerm`
-   - `sortBy` (`Name`, `DateCreated`, `Random`)
-   - `sortOrder` (`Ascending`, `Descending`)
-   - `isFavorite`
-   - `tag`
-   - `productionLocation`
-   - optional `userId`
-3. Result model:
-   - `Items` (`BaseItemDto[]`)
-   - `TotalRecordCount`
-   - `StartIndex`
-   - `PageSize`
-   - `SortBy`
-   - `DetailRoutePreference`
-   - `AvailableTags`
-   - `AvailableProductionLocations`
-   - optional grouped search fields: `NameMatchItems`, `NameMatchCount`, `DescriptionMatchItems`, `DescriptionMatchCount`
+**Read-only web root** (Docker, Windows installer, macOS app bundle):
+1. Patcher fails with `UnauthorizedAccessException` → logs clear guidance
+2. `CastCrewConfigJsonMiddleware` (registered via `IStartupFilter`) intercepts `GET /web/config.json`
+3. Middleware reads original file, injects menuLink, serves modified JSON with `Cache-Control: no-store`
+4. Browser always gets fresh config with the Cast&Crew entry
 
-## 6. Non-Functional Requirements
+### Plugin Lifecycle
 
-1. Compatible with Jellyfin 10.10.x (.NET 8) and 10.11.x (.NET 9) via multi-target build.
-2. Works on desktop and mobile layouts within Jellyfin Web-based clients.
-3. Graceful UI fallback for missing images or API failures.
-4. Avoid hard dependency on undocumented web route internals.
+```
+Jellyfin starts
+  → RegisterServices (PluginServiceRegistrator)
+      → registers CastCrewActorQueryService
+      → registers CastCrewStartupSyncHostedService
+      → registers IStartupFilter (CastCrewConfigJsonMiddleware)
+  → Build() applies IStartupFilter → middleware added to pipeline
+  → StartAsync (hosted service) → attempts file-based sync
+  → GetPages() called by Jellyfin → returns config page
+  → HTTP pipeline active → middleware serves modified config.json
+```
 
-## 7. Risk and Mitigation
+---
 
-1. Risk: Native person route shape varies by web build.
-   - Mitigation: Centralize route fallback logic in cast & crew page.
-2. Risk: Menu placement and web root writeability vary across host builds (notably Windows installer installs under `Program Files` and macOS app bundles under `/Applications`).
-   - Mitigation: Keep adapter endpoint independent of web patching; use best-effort menu/script/page sync and document writable `--webdir` requirement for automatic navigation updates.
-3. Risk: Large person libraries may be expensive to load.
-   - Mitigation: Paginated query and incremental loading.
-4. Risk: Native Jellyfin mobile clients may not render web-injected CastCrew navigation/page surfaces.
-   - Mitigation: Keep `/CastCrew/*` endpoints independent and treat Web UI integration as the primary supported UX surface.
+## API Contract
 
-## 8. Implementation Status (Updated)
+### Endpoints
 
-### Completed
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/CastCrew/Actors` | List actors |
+| GET | `/CastCrew/Directors` | List directors |
+| GET | `/CastCrew/Producers` | List producers |
 
-1. Created plugin project and package references.
-2. Implemented plugin class with `IHasWebPages` registration.
-3. Added plugin configuration model.
-4. Added assembly metadata.
-5. Added cast & crew UI resources (`cast-crew-standalone.html`, `castcrew-top-banner-link.js`, and `actors.html`) with:
-   - Person grid
-   - Search and sorting
-   - Pagination
-   - Loading, empty, and error states
-   - Person card click navigation fallback
-6. Added repository README with current status and milestones.
-7. Added dedicated server controller/service adapter (`CastCrewController` + `CastCrewActorQueryService`) for actor queries.
-8. Refactored frontend page to consume adapter responses.
-9. Added admin configuration page for page size, default sort, top-banner behavior, and route preference.
-10. Improved route resolver compatibility detection and fallback behavior.
-11. Added localization-ready string map and accessibility-focused page semantics.
-12. Added unit tests for query normalization logic.
-13. Added lightweight opt-in integration tests that exercise `/CastCrew/Actors` against a running Jellyfin host.
-14. Added web `config.json` sync for `Cast&Crew` navigation.
-15. Added top-banner Cast&Crew-link/script synchronization through Jellyfin web `config.json` and `index.html` patching when host web assets are writable.
-16. Aligned actor retrieval with Jellyfin `Persons` query behavior to return populated results on 10.11.x.
-17. Embedded Cast&Crew content into Jellyfin home-shell route (`#/home?tab=cast_crew`) and kept `/web/cast-crew.html` as a compatibility redirect.
-18. Added `/CastCrew/Directors` and `/CastCrew/Producers` endpoints with shared query normalization/contract behavior.
-19. Added packaging/release automation via GitHub Actions (`.github/workflows/package-plugin.yml`) to build/test and produce versioned plugin zip artifacts.
-20. Multi-target build support for Jellyfin 10.10.x (net8.0) and 10.11.x (net9.0), producing separate plugin DLLs per host version.
+### Query Parameters
 
-### Pending
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `startIndex` | int | 0 | Pagination offset |
+| `limit` | int | config | Page size (10-200) |
+| `searchTerm` | string | null | Name search filter |
+| `sortBy` | string | config | `Name`, `DateCreated`, or `Random` |
+| `sortOrder` | string | `Ascending` | `Ascending` or `Descending` |
+| `isFavorite` | bool | null | Filter favorites only |
+| `tag` | string | null | Filter by tag |
+| `productionLocation` | string | null | Filter by country/region |
+| `userId` | string | null | User context for favorites |
 
-1. No open items remain for milestones A-G.
+### Response
 
-## 9. Milestone Plan for Copilot CLI
+```json
+{
+  "Items": [...],              // BaseItemDto[]
+  "TotalRecordCount": 150,
+  "StartIndex": 0,
+  "PageSize": 50,
+  "SortBy": "Name",
+  "DetailRoutePreference": "Auto",
+  "AvailableTags": ["tag1"],
+  "AvailableProductionLocations": ["US", "UK"],
+  // When searchTerm is set:
+  "NameMatchItems": [...],
+  "NameMatchCount": 5,
+  "DescriptionMatchItems": [...],
+  "DescriptionMatchCount": 2
+}
+```
 
-1. Milestone A: Plugin scaffold hardening and build pipeline. ✅
-2. Milestone B: Actor API adapter layer on server side. ✅
-3. Milestone C: Front-end refactor to consume adapter endpoints. ✅
-4. Milestone D: Route resolver hardening for person detail navigation. ✅
-5. Milestone E: Admin config page and persisted options. ✅
-6. Milestone F: Tests and packaging. ✅
-7. Milestone G: Directors and Producers endpoints. ✅
+---
 
-## 10. Acceptance Criteria
+## Configuration
 
-1. `Cast&Crew` appears in the Jellyfin Web main menu for authenticated users by default (unless disabled in plugin configuration).
-2. Cast & Crew page can list and paginate person results.
-3. Search and sorting work as expected.
-4. Clicking a person opens Jellyfin person detail page.
-5. Error and empty states are user-visible and non-blocking.
-6. Plugin behavior remains functional on Jellyfin 10.11.x.
-7. Main-menu/page behavior is guaranteed for Jellyfin Web clients; native non-web clients are not required to expose CastCrew UI.
+| Key | Type | Default | Bounds | Description |
+|-----|------|---------|--------|-------------|
+| `DefaultPageSize` | int | 50 | 10–200 | Persons per page |
+| `DefaultSortBy` | string | `Name` | Name, DateCreated | Default sort field |
+| `EnableCastCrewMainMenuEntry` | bool | true | — | Show sidebar entry |
+| `DetailRoutePreference` | string | `Auto` | Auto, HashBang, Hash | Person detail route format |
 
-## 11. Reference Baseline Used
-Local server reference: ../code/jellyfin (https://github.com/jellyfin/jellyfin)
+---
 
-This document is the canonical design baseline for subsequent code generation tasks.
+## Conventions and Rules
+
+### Backend (C#)
+
+- HTTP models in `Api/`, business logic in `Services/`, config in `Configuration/`
+- Extend existing normalizers/services rather than duplicating logic
+- Keep API output contracts stable — breaking changes must be intentional
+- When adding web pages: add to `Web/`, register as `EmbeddedResource` in `.csproj`
+- Plugin identity constants (`Id`, page names) are stable — don't change without migration
+- `JellyfinVersion` in csproj must be the **baseline** (minimum) for each target series
+
+### Frontend (Web)
+
+- Framework-free vanilla JS (IIFE pattern) — no build pipeline
+- Use Jellyfin host globals (`ApiClient`, `Dashboard`) — not external libraries
+- Always escape API strings via `escapeHtml()` before HTML interpolation
+- Preserve API call fallback: `ApiClient.getJSON` → `fetch` with headers
+- Keep route navigation fallback chain: `Dashboard.navigate` → hash/url navigation
+- Maintain localization map and `aria-*` accessibility semantics
+
+### Testing
+
+- Unit tests: deterministic service/normalizer behavior only
+- Integration tests: opt-in via env vars (`CASTCREW_RUN_INTEGRATION_TESTS=true`)
+- Docker tests: auto-run when Docker is available (Testcontainers)
+- Keep `RollForward=Major` in test projects for runtime flexibility
+- Tests multi-target `net8.0` + `net9.0`
+
+---
+
+## Development Commands
+
+| Task | Command |
+|------|---------|
+| Restore | `dotnet restore src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj` |
+| Build | `dotnet build src/Jellyfin.Plugin.CastCrew/Jellyfin.Plugin.CastCrew.csproj` |
+| Unit tests | `dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj` |
+| Docker tests | `dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --filter "FullyQualifiedName~CastCrewDockerIntegrationTests"` |
+| Integration tests | `CASTCREW_RUN_INTEGRATION_TESTS=true CASTCREW_BASE_URL=http://127.0.0.1:8096 CASTCREW_API_KEY=<key> dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj` |
+| Release zip | See CI workflow or `dotnet publish ... --framework net8.0 --output artifacts/publish` |
+
+### Integration Test Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `CASTCREW_RUN_INTEGRATION_TESTS` | Set `true` to enable live-host tests |
+| `CASTCREW_BASE_URL` | Jellyfin URL (default `http://127.0.0.1:8096`) |
+| `CASTCREW_API_KEY` | API key auth |
+| `CASTCREW_USERNAME` / `CASTCREW_PASSWORD` | Username/password auth |
+| `CASTCREW_USER_ID` | Optional: force user context |
+
+---
+
+## CI/CD Pipeline
+
+Workflow: `.github/workflows/package-plugin.yml`
+
+- **Trigger:** Tag push (`v*`) or manual dispatch
+- **Steps:** Restore → Build → Unit tests → Integration tests (Docker excluded) → Publish → Zip → Checksum → Manifest → Upload artifacts → GitHub Release + Pages deploy
+- **Outputs:** `CastCrew_<version>_jellyfin-10.10.zip`, `CastCrew_<version>_jellyfin-10.11.zip`, `manifest.json`
+- **Version:** Derived from git tag (strips `v` prefix) or `.csproj` `<Version>`
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| No sidebar entry (Docker) | Plugin version doesn't have middleware | Update to v0.1.0.6+ |
+| Sidebar shows in private mode only | Browser HTTP cache has stale config.json | Hard refresh (Ctrl+Shift+R) once |
+| `UnauthorizedAccessException` in logs | Read-only web root (expected in Docker) | Normal — middleware handles it |
+| Plugin DLL fails to load in container | Wrong .NET target (net9.0 on 10.10.x host) | Use net8.0 build for Jellyfin 10.10.x |
+| Cast&Crew page blank after clicking | `castcrew-top-banner-link.js` not injected | Expected on read-only roots; page shows standalone UI |
+| Tests timeout on CI | Docker tests running in packaging workflow | Ensure `--filter "!~CastCrewDocker"` in CI |
+
+---
+
+## Risks and Mitigations
+
+| Risk | Mitigation |
+|------|-----------|
+| Jellyfin web route format changes | Route fallback chain in frontend (Auto/HashBang/Hash) |
+| Web root permissions vary by platform | HTTP middleware (Docker) + file sync (writable) + Windows bootstrap |
+| Large person libraries slow to load | Paginated queries; `InternalPeopleQuery` is efficient |
+| Native mobile clients don't show UI | API endpoints remain independent; Web is the supported UX surface |
+| Browser caches stale config.json | `Cache-Control: no-store` on middleware responses |
+
+---
+
+## Copilot / AI Agent Guidance
+
+When working on this codebase as an AI agent:
+
+1. **Read this file first** for architecture context before making changes.
+2. **Check `.github/copilot-instructions.md`** for runtime-specific rules (cleanup, deployment paths).
+3. **Check `.github/instructions/*.instructions.md`** for path-scoped rules when editing specific areas.
+4. **Run tests after changes:** `dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/...`
+5. **For Docker testing:** Docker tests auto-run with Docker available — no env vars needed.
+6. **Key invariants to preserve:**
+   - Plugin GUID: `a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a`
+   - Primary navigation URL: `/web/#/home?tab=cast_crew`
+   - Middleware intercepts exactly `GET /web/config.json`
+   - API contract at `/CastCrew/{Actors,Directors,Producers}` is stable
+   - `EnableInMainMenu` is NOT used for sidebar (only middleware/file sync)
+
+---
+
+*This document is the canonical baseline for all code generation and development tasks.*
