@@ -435,6 +435,111 @@
             });
     }
 
+    function clampColorChannel(value) {
+        return Math.max(0, Math.min(255, Math.round(value)));
+    }
+
+    function parseCssColor(value) {
+        var match = String(value || '').match(/rgba?\(([^)]+)\)/i);
+        if (!match) {
+            return null;
+        }
+
+        var parts = match[1].match(/[\d.]+/g);
+        if (!parts || parts.length < 3) {
+            return null;
+        }
+
+        var red = Number(parts[0]);
+        var green = Number(parts[1]);
+        var blue = Number(parts[2]);
+        if (isNaN(red) || isNaN(green) || isNaN(blue)) {
+            return null;
+        }
+
+        var alpha = 1;
+        if (parts.length >= 4) {
+            alpha = Number(parts[3]);
+            if (isNaN(alpha)) {
+                alpha = 1;
+            }
+        }
+
+        return {
+            channels: [clampColorChannel(red), clampColorChannel(green), clampColorChannel(blue)],
+            alpha: Math.max(0, Math.min(1, alpha))
+        };
+    }
+
+    function toRgba(channels, alpha) {
+        if (!channels || channels.length < 3) {
+            return '';
+        }
+
+        var normalizedAlpha = Number(alpha);
+        if (isNaN(normalizedAlpha)) {
+            normalizedAlpha = 1;
+        }
+
+        normalizedAlpha = Math.max(0, Math.min(1, normalizedAlpha));
+        return 'rgba(' + channels[0] + ',' + channels[1] + ',' + channels[2] + ',' + normalizedAlpha + ')';
+    }
+
+    function resolveThemeTextChannels(element) {
+        var current = element;
+        while (current && current.nodeType === 1) {
+            var currentColor = parseCssColor(window.getComputedStyle(current).color);
+            if (currentColor) {
+                return currentColor.channels;
+            }
+
+            current = current.parentElement;
+        }
+
+        return [255, 255, 255];
+    }
+
+    function resolveThemeBackgroundChannels(element) {
+        var current = element;
+        while (current && current.nodeType === 1) {
+            var backgroundColor = parseCssColor(window.getComputedStyle(current).backgroundColor);
+            if (backgroundColor && backgroundColor.alpha > 0.01) {
+                return backgroundColor.channels;
+            }
+
+            current = current.parentElement;
+        }
+
+        var bodyBackground = document.body ? parseCssColor(window.getComputedStyle(document.body).backgroundColor) : null;
+        if (bodyBackground && bodyBackground.alpha > 0.01) {
+            return bodyBackground.channels;
+        }
+
+        var rootBackground = parseCssColor(window.getComputedStyle(document.documentElement).backgroundColor);
+        if (rootBackground && rootBackground.alpha > 0.01) {
+            return rootBackground.channels;
+        }
+
+        return [28, 28, 28];
+    }
+
+    function applyThemeAwarePalette(host, page) {
+        if (!host || typeof window.getComputedStyle !== 'function') {
+            return;
+        }
+
+        var reference = page || host;
+        var textChannels = resolveThemeTextChannels(reference);
+        var backgroundChannels = resolveThemeBackgroundChannels(reference);
+
+        host.style.setProperty('--castcrew-control-bg', toRgba(textChannels, 0.08));
+        host.style.setProperty('--castcrew-control-bg-strong', toRgba(textChannels, 0.12));
+        host.style.setProperty('--castcrew-control-border', toRgba(textChannels, 0.24));
+        host.style.setProperty('--castcrew-menu-bg', toRgba(backgroundChannels, 0.96));
+        host.style.setProperty('--castcrew-menu-border', toRgba(textChannels, 0.2));
+        host.style.setProperty('--castcrew-menu-text', toRgba(textChannels, 0.96));
+    }
+
     function ensureActorsStyles() {
         if (document.getElementById(castCrewStylesId)) {
             return;
@@ -443,7 +548,7 @@
         var style = document.createElement('style');
         style.id = castCrewStylesId;
         style.textContent = [
-            '.cast_crew-host { padding: 0 1.25em 1.25em; }',
+            '.cast_crew-host { padding: 0 1.25em 1.25em; --castcrew-control-bg: rgba(255,255,255,.07); --castcrew-control-bg-strong: rgba(255,255,255,.12); --castcrew-control-border: rgba(255,255,255,.22); --castcrew-menu-bg: #1c1c1c; --castcrew-menu-border: rgba(255,255,255,.2); --castcrew-menu-text: rgba(255,255,255,.95); }',
             '.castcrew-title-row { display: flex; align-items: center; justify-content: space-between; gap: .6em; }',
             '.castcrew-title-row .sectionTitle { margin: 0; }',
             '.castcrew-tabs { display: flex; gap: 0; margin-bottom: 1em; border-bottom: 1px solid rgba(255,255,255,.15); }',
@@ -453,7 +558,7 @@
             '.castcrew-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: .75em; margin-bottom: 1em; }',
             '.castcrew-toolbar-left { display: flex; gap: .5em; align-items: center; }',
             '.castcrew-toolbar-right { display: flex; gap: .5em; align-items: center; position: relative; }',
-            '.castcrew-input, .castcrew-select { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.15); color: inherit; border-radius: .4em; padding: .5em .65em; min-height: 2.2em; }',
+            '.castcrew-input, .castcrew-select { background: var(--castcrew-control-bg); border: 1px solid var(--castcrew-control-border); color: var(--castcrew-menu-text); border-radius: .4em; padding: .5em .65em; min-height: 2.2em; }',
             '.castcrew-input { min-width: 14em; }',
             '.castcrew-button { border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: inherit; border-radius: .4em; padding: .5em .85em; cursor: pointer; }',
             '.castcrew-button[disabled] { opacity: .5; cursor: default; }',
@@ -481,10 +586,11 @@
             '.castcrew-match-count { font-weight: 600; color: rgba(255,255,255,.85); }',
             '.castcrew-section-empty { color: rgba(255,255,255,.5); font-size: .9em; padding: .8em 0; margin: 0; }',
             '.castcrew-section-divider { border: none; border-top: 1px solid rgba(255,255,255,.1); margin: 1.5em 0 0.2em; }',
-            '.castcrew-filter-menu { position: absolute; right: 0; top: 2.5em; background: #1c1c1c; border: 1px solid rgba(255,255,255,.2); border-radius: .4em; padding: .6em .8em; z-index: 10; min-width: 10em; }',
-            '.castcrew-filter-option { display: flex; align-items: center; gap: .5em; color: rgba(255,255,255,.85); font-size: .9em; cursor: pointer; padding: .3em 0; }',
-            '.castcrew-filter-label { display: block; color: rgba(255,255,255,.8); font-size: .78em; margin-top: .55em; margin-bottom: .25em; }',
-            '.castcrew-filter-select { width: 100%; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.2); color: inherit; border-radius: .35em; padding: .45em .55em; min-height: 2.1em; }',
+            '.castcrew-filter-menu { position: absolute; right: 0; top: 2.5em; background: var(--castcrew-menu-bg); border: 1px solid var(--castcrew-menu-border); border-radius: .4em; padding: .6em .8em; z-index: 10; min-width: 10em; color: var(--castcrew-menu-text); }',
+            '.castcrew-filter-option { display: flex; align-items: center; gap: .5em; color: var(--castcrew-menu-text); font-size: .9em; cursor: pointer; padding: .3em 0; }',
+            '.castcrew-filter-label { display: block; color: var(--castcrew-menu-text); opacity: .85; font-size: .78em; margin-top: .55em; margin-bottom: .25em; }',
+            '.castcrew-filter-select { width: 100%; background: var(--castcrew-control-bg-strong); border: 1px solid var(--castcrew-control-border); color: var(--castcrew-menu-text); border-radius: .35em; padding: .45em .55em; min-height: 2.1em; }',
+            '.castcrew-select option, .castcrew-filter-select option { background: var(--castcrew-menu-bg); color: var(--castcrew-menu-text); }',
             '.castcrew-pagination { margin-top: 1em; display: flex; align-items: center; justify-content: center; gap: .8em; }'
         ].join('');
 
@@ -582,6 +688,8 @@
             bindActorsEvents(host);
             host.dataset.castcrewBound = 'true';
         }
+
+        applyThemeAwarePalette(host, page);
 
         return host;
     }
