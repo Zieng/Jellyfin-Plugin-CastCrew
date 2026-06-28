@@ -31,25 +31,34 @@ internal static class CastCrewWebConfigPatcher
     private const string TopBannerScriptTag = "<script src=\"castcrew-top-banner-link.js\" defer></script>";
     private const string JellyfinWebDirEnvVar = "JELLYFIN_WEB_DIR";
 
+    /// <summary>
+    /// Tracks the most recent sync status so that fallback page registration
+    /// can be determined without re-running the sync operation.
+    /// </summary>
+    internal static CastCrewWebConfigSyncStatus LastSyncStatus { get; private set; } = CastCrewWebConfigSyncStatus.Failed;
+
     public static CastCrewWebConfigSyncStatus SyncCastCrewMenuLink(string? webPath, bool enabled, ILogger? logger = null)
     {
         if (string.IsNullOrWhiteSpace(webPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath is empty.");
-            return CastCrewWebConfigSyncStatus.Failed;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.Failed;
+            return LastSyncStatus;
         }
 
         if (!Directory.Exists(webPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: WebPath '{0}' does not exist.", webPath);
-            return CastCrewWebConfigSyncStatus.Failed;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.Failed;
+            return LastSyncStatus;
         }
 
         var configPath = Path.Combine(webPath, ConfigFileName);
         if (!File.Exists(configPath))
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: '{0}' was not found.", configPath);
-            return CastCrewWebConfigSyncStatus.Failed;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.Failed;
+            return LastSyncStatus;
         }
 
         try
@@ -121,7 +130,8 @@ internal static class CastCrewWebConfigPatcher
 
             if (!changed)
             {
-                return CastCrewWebConfigSyncStatus.Succeeded;
+                LastSyncStatus = CastCrewWebConfigSyncStatus.Succeeded;
+                return LastSyncStatus;
             }
 
             var jsonOptions = new JsonSerializerOptions
@@ -134,16 +144,21 @@ internal static class CastCrewWebConfigPatcher
                 root.ToJsonString(jsonOptions) + Environment.NewLine);
 
             Log(logger, LogLevel.Information, "Successfully synced Cast & Crew menu link (enabled={0}).", enabled);
-            return CastCrewWebConfigSyncStatus.Succeeded;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.Succeeded;
+            return LastSyncStatus;
         }
         catch (IOException ex)
         {
             Log(logger, LogLevel.Error, "Unable to sync menu link: I/O failure writing to web root. {0}", ex.Message);
-            return CastCrewWebConfigSyncStatus.Failed;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.Failed;
+            return LastSyncStatus;
         }
         catch (UnauthorizedAccessException ex)
         {
-            Log(logger, LogLevel.Error, "Unable to sync menu link: access denied to web root. Installer-based web roots (for example Program Files) are often read-only; use a writable --webdir or grant Jellyfin write access. {0}", ex.Message);
+            Log(logger, LogLevel.Error, "Unable to sync menu link: access denied to web root. " +
+                "This commonly occurs in Docker containers or installer-based deployments where the web root is read-only. " +
+                "To fix: mount the web directory as a writable volume, use a writable --webdir, or grant Jellyfin write access. " +
+                "The plugin will fall back to a built-in Cast & Crew page. {0}", ex.Message);
 
             var configuredFallback = TryConfigureUserWebDirFallback(
                 webPath,
@@ -163,12 +178,14 @@ internal static class CastCrewWebConfigPatcher
                     JellyfinWebDirEnvVar);
             }
 
-            return CastCrewWebConfigSyncStatus.FailedNeedsWritableWebRoot;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.FailedNeedsWritableWebRoot;
+            return LastSyncStatus;
         }
         catch (JsonException ex)
         {
             Log(logger, LogLevel.Warning, "Unable to sync menu link: invalid JSON in config. {0}", ex.Message);
-            return CastCrewWebConfigSyncStatus.Failed;
+            LastSyncStatus = CastCrewWebConfigSyncStatus.Failed;
+            return LastSyncStatus;
         }
     }
 

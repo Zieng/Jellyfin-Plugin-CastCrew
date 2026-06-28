@@ -34,3 +34,6 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
+
+# Docker test runtime data (config volumes)
+tests/docker/config/

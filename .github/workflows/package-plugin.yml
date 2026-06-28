@@ -53,7 +53,7 @@ jobs:
         run: dotnet test tests/Jellyfin.Plugin.CastCrew.Tests/Jellyfin.Plugin.CastCrew.Tests.csproj --configuration Release -p:Version=${{ steps.version.outputs.value }}
 
       - name: Run integration test project (opt-in tests remain skipped by default)
-        run: dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --configuration Release -p:Version=${{ steps.version.outputs.value }}
+        run: dotnet test tests/Jellyfin.Plugin.CastCrew.IntegrationTests/Jellyfin.Plugin.CastCrew.IntegrationTests.csproj --configuration Release -p:Version=${{ steps.version.outputs.value }} --filter "FullyQualifiedName!~CastCrewDockerIntegrationTests"
 
       - name: Publish plugin assemblies
         shell: bash
@@ -121,7 +121,7 @@ jobs:
           version="${{ steps.version.outputs.value }}"
           pages_url="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
           timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          changelog="Try to fix the issue that the plugin does not work on windows installer based jellyfin round 3."
+          changelog="Try to fix the docker based jellyfin not working issue."
           cat > artifacts/manifest.json << EOF
           [
             {
