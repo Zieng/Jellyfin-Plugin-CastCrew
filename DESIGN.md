@@ -192,6 +192,8 @@ Jellyfin starts
 }
 ```
 
+`LibraryMappingLastSyncedUtc` is `null` while the person-library mapping sync is still pending.
+
 ---
 
 ## Configuration

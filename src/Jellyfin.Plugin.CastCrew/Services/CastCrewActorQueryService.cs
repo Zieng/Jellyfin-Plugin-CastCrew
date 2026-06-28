@@ -57,7 +57,8 @@ public sealed class CastCrewActorQueryService
     {
         var configuration = CastCrewPlugin.Instance?.Configuration ?? new PluginConfiguration();
         var normalizedQuery = CastCrewActorQueryNormalizer.Normalize(query, configuration);
-        _mappingService.EnsureMappingBuilt();
+        var libraryMappingLastSyncedUtc = NormalizeMappingSyncTime(_mappingService.LastBuildTime);
+        var isLibraryMappingReady = libraryMappingLastSyncedUtc.HasValue;
 
         var availableLibraries = _mappingService
             .GetMappedLibraries()
@@ -67,7 +68,6 @@ public sealed class CastCrewActorQueryService
                 Name = library.Name
             })
             .ToArray();
-        var libraryMappingLastSyncedUtc = NormalizeMappingSyncTime(_mappingService.LastBuildTime);
 
         var effectiveLibraryIds = ResolveEffectiveLibraryIds(
             configuration.IncludedLibraryIds,
@@ -99,6 +99,7 @@ public sealed class CastCrewActorQueryService
                 personType,
                 dtoOptions,
                 effectiveLibraryIds,
+                isLibraryMappingReady,
                 availableLibraries,
                 libraryMappingLastSyncedUtc);
         }
@@ -137,7 +138,7 @@ public sealed class CastCrewActorQueryService
         }
 
         // Apply library filter
-        var libraryFilteredPersons = ApplyLibraryFilter(allPersons, effectiveLibraryIds);
+        var libraryFilteredPersons = ApplyLibraryFilter(allPersons, effectiveLibraryIds, isLibraryMappingReady);
 
         CastCrewDebugLogging.LogInformation(
             _logger,
@@ -188,6 +189,7 @@ public sealed class CastCrewActorQueryService
         string personType,
         DtoOptions dtoOptions,
         IReadOnlyList<string> effectiveLibraryIds,
+        bool isLibraryMappingReady,
         IReadOnlyList<CastCrewLibraryOption> availableLibraries,
         DateTime? libraryMappingLastSyncedUtc)
     {
@@ -241,8 +243,8 @@ public sealed class CastCrewActorQueryService
         }
 
         // Apply library filter
-        nameMatchPersons = ApplyLibraryFilter(nameMatchPersons, effectiveLibraryIds);
-        allPersons = ApplyLibraryFilter(allPersons, effectiveLibraryIds);
+        nameMatchPersons = ApplyLibraryFilter(nameMatchPersons, effectiveLibraryIds, isLibraryMappingReady);
+        allPersons = ApplyLibraryFilter(allPersons, effectiveLibraryIds, isLibraryMappingReady);
 
         CastCrewDebugLogging.LogInformation(
             _logger,
@@ -309,14 +311,24 @@ public sealed class CastCrewActorQueryService
         };
     }
 
-    private IReadOnlyList<Person> ApplyLibraryFilter(IReadOnlyList<Person> persons, IReadOnlyList<string> includedLibraryIds)
+    private IReadOnlyList<Person> ApplyLibraryFilter(
+        IReadOnlyList<Person> persons,
+        IReadOnlyList<string> includedLibraryIds,
+        bool isLibraryMappingReady)
     {
         if (includedLibraryIds is null || includedLibraryIds.Count == 0)
         {
             return persons;
         }
 
-        _mappingService.EnsureMappingBuilt();
+        if (!isLibraryMappingReady)
+        {
+            CastCrewDebugLogging.LogInformation(
+                _logger,
+                "Skipping library filter because person-library mapping is still pending. IncludedLibraryFilterCount={LibraryFilterCount}.",
+                includedLibraryIds.Count);
+            return persons;
+        }
 
         return persons
             .Where(person => _mappingService.IsPersonInLibraries(person.Name, includedLibraryIds))

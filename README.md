@@ -62,6 +62,7 @@ Go to **Dashboard → Plugins → CastCrew** to configure:
 | Included Libraries | All libraries | Restrict Cast & Crew results to people that appear in movies from selected libraries |
 
 Library-person mapping refreshes automatically after saving settings and when library content changes. The Cast & Crew page header also includes a manual refresh button and displays the latest sync timestamp.
+If mapping sync is still pending, Cast & Crew results still load immediately and library scoping is applied after the sync finishes.
 
 ## Compatibility
 
