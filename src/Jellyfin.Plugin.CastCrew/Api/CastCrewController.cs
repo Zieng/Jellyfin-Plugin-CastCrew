@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Jellyfin.Plugin.CastCrew.Services;
+using Jellyfin.Plugin.CastCrew.Metadata;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -17,17 +18,20 @@ public sealed class CastCrewController : ControllerBase
     private readonly CastCrewActorQueryService _actorQueryService;
     private readonly CastCrewLibraryPersonMappingService _mappingService;
     private readonly ILogger<CastCrewController> _logger;
+    private readonly MetadataSearchService _metadataSearchService;
 
     public CastCrewController(
         IUserManager userManager,
         CastCrewActorQueryService actorQueryService,
         CastCrewLibraryPersonMappingService mappingService,
-        ILogger<CastCrewController> logger)
+        ILogger<CastCrewController> logger,
+        MetadataSearchService metadataSearchService)
     {
         _userManager = userManager;
         _actorQueryService = actorQueryService;
         _mappingService = mappingService;
         _logger = logger;
+        _metadataSearchService = metadataSearchService;
     }
 
     /// <summary>
@@ -80,6 +84,35 @@ public sealed class CastCrewController : ControllerBase
     /// <summary>
     /// Returns the list of available media libraries that can be used for filtering.
     /// </summary>
+    [HttpGet("Metadata/Search")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<MetadataSearchResponse>> SearchMetadata(
+        [FromQuery] MetadataPersonType type = MetadataPersonType.Actor,
+        [FromQuery] string? name = null,
+        [FromQuery] int? minAge = null, [FromQuery] int? maxAge = null,
+        [FromQuery] decimal? minHeight = null, [FromQuery] decimal? maxHeight = null,
+        [FromQuery] decimal? minBust = null, [FromQuery] decimal? maxBust = null,
+        [FromQuery] decimal? minWaist = null, [FromQuery] decimal? maxWaist = null,
+        [FromQuery] decimal? minHip = null, [FromQuery] decimal? maxHip = null,
+        [FromQuery] int? minVideoCount = null, [FromQuery] int? maxVideoCount = null,
+        [FromQuery] int startIndex = 0, [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        if (!(User?.Identity?.IsAuthenticated ?? false))
+            return Unauthorized();
+
+        var query = new MetadataSearchQuery
+        {
+            Type = type, Name = name, MinAge = minAge, MaxAge = maxAge,
+            MinHeight = minHeight, MaxHeight = maxHeight, MinBust = minBust, MaxBust = maxBust,
+            MinWaist = minWaist, MaxWaist = maxWaist, MinHip = minHip, MaxHip = maxHip,
+            MinVideoCount = minVideoCount, MaxVideoCount = maxVideoCount,
+            StartIndex = Math.Max(0, startIndex), Limit = Math.Clamp(limit, 1, 200)
+        };
+        return Ok(await _metadataSearchService.SearchAsync(query, cancellationToken).ConfigureAwait(false));
+    }
+
     [HttpGet("Libraries")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]

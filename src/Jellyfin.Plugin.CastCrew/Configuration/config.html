@@ -56,6 +56,47 @@
             </div>
 
             <div class="verticalSection">
+                <h1 id="metadataSourcesTitle" style="margin:.5em 0">Metadata Sources</h1>
+                <div id="metadataSourcesDescription" class="fieldDescription">Enable each metadata provider independently. Disabled providers are not contacted.</div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label><input id="enableTmdbProvider" is="emby-checkbox" type="checkbox" /><span id="enableTmdbLabel">Enable TMDB</span></label>
+                    <div id="tmdbDescription" class="fieldDescription">Requires a TMDB API Bearer Token. Used for actor, director and studio/company search.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" id="tmdbTokenLabel" for="tmdbApiToken">TMDB API Bearer Token</label>
+                    <input is="emby-input" id="tmdbApiToken" type="password" autocomplete="off" />
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label><input id="enableMasexProvider" is="emby-checkbox" type="checkbox" /><span id="enableMasexLabel">Enable MASex</span></label>
+                    <div id="masexDescription" class="fieldDescription">Actor list source. The URL is configurable so site routing changes do not require a plugin release.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" id="masexUrlLabel" for="masexActorUrl">MASex Actor URL</label>
+                    <input is="emby-input" id="masexActorUrl" type="url" />
+                </div>
+
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label><input id="enableNetflavProvider" is="emby-checkbox" type="checkbox" /><span id="enableNetflavLabel">Enable Netflav</span></label>
+                    <div id="netflavDescription" class="fieldDescription">Actor source with age, height, bust, waist, hip and video-count filtering when those fields are available.</div>
+                </div>
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" id="netflavUrlLabel" for="netflavActorUrl">Netflav Actor URL</label>
+                    <input is="emby-input" id="netflavActorUrl" type="url" />
+                </div>
+
+                <div class="inputContainer">
+                    <label class="inputLabel inputLabelUnfocused" id="uiLanguageLabel" for="uiLanguage">Management Language</label>
+                    <select is="emby-select" id="uiLanguage" class="emby-select-withcolor emby-select">
+                        <option value="Auto">Auto</option>
+                        <option value="English">English</option>
+                        <option value="Chinese">中文</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="verticalSection">
                 <div class="folders">
                     <h1 style="margin:.5em 0">Included Libraries</h1>
                     <div class="fieldDescription" style="margin-bottom: 0.5em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
@@ -106,6 +147,13 @@
                 enableCastCrewMainMenuEntry: document.getElementById('enableCastCrewMainMenuEntry'),
                 enableDebugLogging: document.getElementById('enableDebugLogging'),
                 detailRoutePreference: document.getElementById('detailRoutePreference'),
+                enableTmdbProvider: document.getElementById('enableTmdbProvider'),
+                tmdbApiToken: document.getElementById('tmdbApiToken'),
+                enableMasexProvider: document.getElementById('enableMasexProvider'),
+                masexActorUrl: document.getElementById('masexActorUrl'),
+                enableNetflavProvider: document.getElementById('enableNetflavProvider'),
+                netflavActorUrl: document.getElementById('netflavActorUrl'),
+                uiLanguage: document.getElementById('uiLanguage'),
                 libraryPicker: document.getElementById('libraryPicker'),
                 addLibraryButton: document.getElementById('addLibraryButton'),
                 selectedLibrariesContainer: document.getElementById('selectedLibrariesContainer'),
@@ -468,11 +516,41 @@
                 return postRequest(url);
             }
 
+            var translations = {
+                English: { title: 'Metadata Sources', desc: 'Enable each metadata provider independently. Disabled providers are not contacted.', tmdb: 'Enable TMDB', tmdbDesc: 'Requires a TMDB API Bearer Token. Used for actor, director and studio/company search.', token: 'TMDB API Bearer Token', masex: 'Enable MASex', masexDesc: 'Actor list source. The URL is configurable so site routing changes do not require a plugin release.', masexUrl: 'MASex Actor URL', netflav: 'Enable Netflav', netflavDesc: 'Actor source with age, height, bust, waist, hip and video-count filtering when those fields are available.', netflavUrl: 'Netflav Actor URL', language: 'Management Language' },
+                Chinese: { title: '元数据来源', desc: '每个元数据源都可以独立启用或停用。停用的来源不会发起网络请求。', tmdb: '启用 TMDB', tmdbDesc: '需要填写 TMDB API Bearer Token，用于演员、导演和片商/公司搜索。', token: 'TMDB API Bearer Token', masex: '启用 MASex', masexDesc: '演员列表来源。URL 可配置，网站路由变化时无需重新发布插件。', masexUrl: 'MASex 演员 URL', netflav: '启用 Netflav', netflavDesc: '演员来源；如果站点提供对应字段，可按年龄、身高、胸围、腰围、臀围和影片数筛选。', netflavUrl: 'Netflav 演员 URL', language: '管理界面语言' }
+            };
+
+            function applyLanguage(value) {
+                var lang = value === 'Chinese' ? 'Chinese' : value === 'English' ? 'English' : (navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'Chinese' : 'English';
+                var t = translations[lang];
+                document.getElementById('metadataSourcesTitle').textContent = t.title;
+                document.getElementById('metadataSourcesDescription').textContent = t.desc;
+                document.getElementById('enableTmdbLabel').textContent = t.tmdb;
+                document.getElementById('tmdbDescription').textContent = t.tmdbDesc;
+                document.getElementById('tmdbTokenLabel').textContent = t.token;
+                document.getElementById('enableMasexLabel').textContent = t.masex;
+                document.getElementById('masexDescription').textContent = t.masexDesc;
+                document.getElementById('masexUrlLabel').textContent = t.masexUrl;
+                document.getElementById('enableNetflavLabel').textContent = t.netflav;
+                document.getElementById('netflavDescription').textContent = t.netflavDesc;
+                document.getElementById('netflavUrlLabel').textContent = t.netflavUrl;
+                document.getElementById('uiLanguageLabel').textContent = t.language;
+            }
+
             function applyConfig(config) {
                 refs.defaultPageSize.value = normalizePageSize(config.DefaultPageSize);
                 refs.defaultSortBy.value = normalizeSortBy(config.DefaultSortBy);
                 refs.enableCastCrewMainMenuEntry.checked = config.EnableCastCrewMainMenuEntry !== false;
                 refs.enableDebugLogging.checked = config.EnableDebugLogging === true;
+                refs.enableTmdbProvider.checked = config.EnableTmdbProvider === true;
+                refs.tmdbApiToken.value = config.TmdbApiToken || '';
+                refs.enableMasexProvider.checked = config.EnableMasexProvider === true;
+                refs.masexActorUrl.value = config.MasexActorUrl || 'https://masex.tv/zh-CN/actor';
+                refs.enableNetflavProvider.checked = config.EnableNetflavProvider === true;
+                refs.netflavActorUrl.value = config.NetflavActorUrl || 'https://netflav.com/actress';
+                refs.uiLanguage.value = config.UiLanguage || 'Auto';
+                applyLanguage(refs.uiLanguage.value);
                 refs.detailRoutePreference.value = normalizeRoutePreference(config.DetailRoutePreference);
                 selectedLibraryIds = normalizeSelectedLibraryIds(config.IncludedLibraryIds || []);
                 renderLibraryPicker();
@@ -510,6 +588,13 @@
                         config.DefaultSortBy = normalizeSortBy(refs.defaultSortBy.value);
                         config.EnableCastCrewMainMenuEntry = refs.enableCastCrewMainMenuEntry.checked;
                         config.EnableDebugLogging = refs.enableDebugLogging.checked;
+                        config.EnableTmdbProvider = refs.enableTmdbProvider.checked;
+                        config.TmdbApiToken = refs.tmdbApiToken.value.trim();
+                        config.EnableMasexProvider = refs.enableMasexProvider.checked;
+                        config.MasexActorUrl = refs.masexActorUrl.value.trim();
+                        config.EnableNetflavProvider = refs.enableNetflavProvider.checked;
+                        config.NetflavActorUrl = refs.netflavActorUrl.value.trim();
+                        config.UiLanguage = refs.uiLanguage.value;
                         config.DetailRoutePreference = normalizeRoutePreference(refs.detailRoutePreference.value);
                         config.IncludedLibraryIds = selectedLibraryIds.slice();
 
@@ -546,6 +631,7 @@
                     });
             }
 
+            refs.uiLanguage.addEventListener('change', function () { applyLanguage(refs.uiLanguage.value); });
             refs.form.addEventListener('submit', saveConfig);
             refs.addLibraryButton.addEventListener('click', addSelectedLibrary);
             refs.selectedLibrariesContainer.addEventListener('click', function (event) {

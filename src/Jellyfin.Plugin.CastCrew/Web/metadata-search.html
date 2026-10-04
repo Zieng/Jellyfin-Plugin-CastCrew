@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CastCrew Metadata</title>
+<style>
+body{font-family:"Segoe UI","Noto Sans",sans-serif;margin:0}.page{max-width:1400px;margin:auto;padding:24px}.toolbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.toolbar input,.toolbar select,.toolbar button{padding:9px;border-radius:7px;border:1px solid var(--jf-divider-color,#444);background:var(--jf-background-color,#111);color:inherit}.toolbar .wide{grid-column:span 2}.results{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:18px}.card{overflow:hidden;border:1px solid var(--jf-divider-color,#444);border-radius:10px}.card img{width:100%;aspect-ratio:2/3;object-fit:cover;background:#222}.card div{padding:9px}.muted{opacity:.7;font-size:.9em}.actions{display:flex;gap:8px;margin-top:12px}.section{margin-top:16px}
+</style></head>
+<body><div class="page">
+<h1 id="title">Metadata Search</h1>
+<div class="toolbar">
+<select id="type"><option value="Actor">Actors</option><option value="Director">Directors</option><option value="Studio">Studios / Manufacturers</option></select>
+<input id="name" class="wide" placeholder="Name">
+<input id="minAge" type="number" placeholder="Min age"><input id="maxAge" type="number" placeholder="Max age">
+<input id="minHeight" type="number" placeholder="Min height (cm)"><input id="maxHeight" type="number" placeholder="Max height (cm)">
+<input id="minBust" type="number" placeholder="Min bust"><input id="maxBust" type="number" placeholder="Max bust">
+<input id="minWaist" type="number" placeholder="Min waist"><input id="maxWaist" type="number" placeholder="Max waist">
+<input id="minHip" type="number" placeholder="Min hip"><input id="maxHip" type="number" placeholder="Max hip">
+<input id="minVideoCount" type="number" placeholder="Min videos"><input id="maxVideoCount" type="number" placeholder="Max videos">
+</div><div class="actions"><button id="search">Search</button><button id="reset">Reset</button></div>
+<div id="status" class="section muted"></div><div id="results" class="results"></div><div id="errors" class="section muted"></div>
+</div>
+<script>
+(function(){'use strict';
+var ids=['name','minAge','maxAge','minHeight','maxHeight','minBust','maxBust','minWaist','maxWaist','minHip','maxHip','minVideoCount','maxVideoCount'];
+function url(){var q=new URLSearchParams();q.set('type',document.getElementById('type').value);ids.forEach(function(id){var v=document.getElementById(id).value;if(v)q.set(id,v);});q.set('limit','100');return (window.ApiClient&&ApiClient.getUrl?ApiClient.getUrl('CastCrew/Metadata/Search'):('/CastCrew/Metadata/Search?'+q.toString()))+(window.ApiClient&&ApiClient.getUrl?'?'+q.toString():'');}
+function esc(s){var d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function search(){document.getElementById('status').textContent='Loading...';fetch(url(),{headers:window.ApiClient&&ApiClient.getRequestHeaders?ApiClient.getRequestHeaders():{}}).then(function(r){if(!r.ok)throw Error('HTTP '+r.status);return r.json();}).then(function(data){document.getElementById('status').textContent='Results: '+data.TotalRecordCount+' | Sources: '+(data.EnabledSources||[]).join(', ');document.getElementById('errors').textContent=(data.Errors||[]).join(' | ');document.getElementById('results').innerHTML=(data.Items||[]).map(function(x){return '<article class="card">'+(x.ImageUrl?'<img loading="lazy" src="'+esc(x.ImageUrl)+'">':'')+'<div><strong>'+esc(x.Name)+'</strong><div class="muted">'+esc(x.Source)+'</div>'+(x.Age?'Age: '+x.Age+' ':'')+(x.HeightCm?'Height: '+x.HeightCm+'cm ':'')+(x.VideoCount?'Videos: '+x.VideoCount:'')+(x.ProfileUrl?'<div><a href="'+esc(x.ProfileUrl)+'" target="_blank" rel="noreferrer">Open source</a></div>':'')+'</div></article>';}).join('');}).catch(function(e){document.getElementById('status').textContent='Search failed: '+e.message;});}
+document.getElementById('search').onclick=search;document.getElementById('reset').onclick=function(){ids.forEach(function(id){document.getElementById(id).value='';});search();};document.getElementById('type').onchange=function(){var studio=this.value==='Studio';['minAge','maxAge','minHeight','maxHeight','minBust','maxBust','minWaist','maxWaist','minHip','maxHip','minVideoCount','maxVideoCount'].forEach(function(id){document.getElementById(id).disabled=studio;});};search();
+})();
+</script></body></html>

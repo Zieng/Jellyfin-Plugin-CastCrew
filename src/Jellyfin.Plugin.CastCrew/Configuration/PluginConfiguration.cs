@@ -19,6 +19,14 @@ public class PluginConfiguration : BasePluginConfiguration
     /// An empty array means all libraries are included (default behavior).
     /// </summary>
     public string[] IncludedLibraryIds { get; set; } = Array.Empty<string>();
+
+    public bool EnableTmdbProvider { get; set; } = false;
+    public string TmdbApiToken { get; set; } = string.Empty;
+    public bool EnableMasexProvider { get; set; } = false;
+    public string MasexActorUrl { get; set; } = "https://masex.tv/zh-CN/actor";
+    public bool EnableNetflavProvider { get; set; } = false;
+    public string NetflavActorUrl { get; set; } = "https://netflav.com/actress";
+    public string UiLanguage { get; set; } = "Auto";
 }
 
 public static class CastCrewConfigurationDefaults

@@ -58,5 +58,12 @@ public class CastCrewPlugin : BasePlugin<PluginConfiguration>, IHasPluginConfigu
             DisplayName = "CastCrew",
             EmbeddedResourcePath = $"{prefix}.Configuration.config.html"
         };
+
+        yield return new PluginPageInfo
+        {
+            Name = "castcrew-metadata",
+            DisplayName = "CastCrew Metadata",
+            EmbeddedResourcePath = $"{prefix}.Web.metadata-search.html"
+        };
     }
 }
