@@ -1,0 +1,6 @@
+{
+  "name": "Jellyfin Cast & Crew",
+  "description": "Browse actors, directors, and producers with search, role tabs, library filtering, person details, and configuration for Jellyfin.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -8,6 +8,8 @@ namespace Jellyfin.Plugin.CastCrew.Metadata;
 public sealed class NetflavMetadataProvider : HtmlMetadataProvider
 {
     private static readonly Regex MetricRegex = new("(?<label>age|height|胸围|bust|腰围|waist|臀围|hip|videos?|影片)\\D{0,15}(?<value>\\d+(?:\\.\\d+)?)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex IconRegex = new("\"icon\"\\s*:\\s*\"(?<icon>[^\"]+)\"", RegexOptions.Compiled);
+    private static readonly Regex OgImageRegex = new("<meta[^>]+property=[\"']og:image[\"'][^>]+content=[\"'](?<image>[^\"]+)[\"']", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public NetflavMetadataProvider(ILogger<NetflavMetadataProvider> logger) : base(logger) { }
     public override string Name => "Netflav";
@@ -52,6 +54,17 @@ public sealed class NetflavMetadataProvider : HtmlMetadataProvider
 
     private static void ParseMetrics(string html, MetadataPerson person)
     {
+        if (string.IsNullOrWhiteSpace(person.ImageUrl))
+        {
+            var iconMatch = IconRegex.Match(html);
+            if (iconMatch.Success) person.ImageUrl = iconMatch.Groups["icon"].Value;
+            else
+            {
+                var ogMatch = OgImageRegex.Match(html);
+                if (ogMatch.Success) person.ImageUrl = ogMatch.Groups["image"].Value;
+            }
+        }
+
         var text = WebUtility.HtmlDecode(Regex.Replace(html, "<[^>]+>", " "));
         text = Regex.Replace(text, "\\s+", " ");
         foreach (Match match in MetricRegex.Matches(text))

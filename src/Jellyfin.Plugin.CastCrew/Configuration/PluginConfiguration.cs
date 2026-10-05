@@ -20,7 +20,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public string[] IncludedLibraryIds { get; set; } = Array.Empty<string>();
 
-    public bool EnableTmdbProvider { get; set; } = false;
+    public bool EnableTmdbProvider { get; set; } = true;
     public string TmdbApiToken { get; set; } = string.Empty;
     public bool EnableMasexProvider { get; set; } = false;
     public string MasexActorUrl { get; set; } = "https://masex.tv/zh-CN/actor";
