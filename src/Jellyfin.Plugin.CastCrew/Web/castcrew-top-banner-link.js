@@ -45,6 +45,30 @@
         metadataMode: false
     };
 
+    var frontendTexts = {
+        en: {loading:'Loading...',results:'Results: ',sources:' | Sources: ',failed:'Search failed: ',age:'Age',height:'Height',bust:'Bust',waist:'Waist',hip:'Hip',videos:'Videos',open:'Open source',noImage:'No image',noResults:'No results'},
+        zh: {loading:'正在加载……',results:'结果：',sources:' | 来源：',failed:'搜索失败：',age:'年龄',height:'身高',bust:'胸围',waist:'腰围',hip:'臀围',videos:'影片数',open:'打开来源',noImage:'无图片',noResults:'没有找到结果'}
+    };
+
+    function getFrontendText(key) {
+        var chinese = state.uiLanguage === 'Chinese' || (state.uiLanguage === 'Auto' && (navigator.language || '').toLowerCase().indexOf('zh') === 0);
+        return (chinese ? frontendTexts.zh : frontendTexts.en)[key] || key;
+    }
+
+    function hideJellyfinLoading() {
+        if (window.Dashboard && typeof window.Dashboard.hideLoadingMsg === 'function') {
+            try {
+                window.Dashboard.hideLoadingMsg();
+            } catch (e) {}
+        }
+        try {
+            var spinners = document.querySelectorAll('.docspinner, .loading, .view-loading, [data-role="loader"]');
+            for (var i = 0; i < spinners.length; i++) {
+                spinners[i].style.display = 'none';
+            }
+        } catch (e) {}
+    }
+
     var refs = null;
     var scheduled = null;
     var lastObserverFireTime = 0;
@@ -129,12 +153,17 @@
     }
 
     function getCurrentUserId() {
-        if (window.ApiClient && typeof window.ApiClient.getCurrentUserId === 'function') {
-            return window.ApiClient.getCurrentUserId();
-        }
-
-        if (window.ApiClient && window.ApiClient._serverInfo && window.ApiClient._serverInfo.UserId) {
-            return window.ApiClient._serverInfo.UserId;
+        if (window.ApiClient) {
+            if (typeof window.ApiClient.getCurrentUserId === 'function') {
+                var u = window.ApiClient.getCurrentUserId();
+                if (u) return u;
+            }
+            if (window.ApiClient._serverInfo && window.ApiClient._serverInfo.UserId) {
+                return window.ApiClient._serverInfo.UserId;
+            }
+            if (window.ApiClient._currentUserId) {
+                return window.ApiClient._currentUserId;
+            }
         }
 
         var credentials = readCredentials();
@@ -144,6 +173,24 @@
     function resolveAuthToken() {
         if (state.authToken) {
             return state.authToken;
+        }
+
+        if (window.ApiClient) {
+            if (typeof window.ApiClient.accessToken === 'function') {
+                var token = window.ApiClient.accessToken();
+                if (token) {
+                    state.authToken = token;
+                    return token;
+                }
+            }
+            if (window.ApiClient._serverInfo && window.ApiClient._serverInfo.AccessToken) {
+                state.authToken = window.ApiClient._serverInfo.AccessToken;
+                return state.authToken;
+            }
+            if (window.ApiClient._accessToken) {
+                state.authToken = window.ApiClient._accessToken;
+                return state.authToken;
+            }
         }
 
         var credentials = readCredentials();
@@ -1085,8 +1132,11 @@
             params.set('libraryIds', refs.libraryFilter.value);
         }
 
-        var endpoint = '/CastCrew/' + state.activeTab;
-        return endpoint + '?' + params.toString();
+        var endpoint = 'CastCrew/' + state.activeTab + '?' + params.toString();
+        if (window.ApiClient && typeof window.ApiClient.getUrl === 'function') {
+            return window.ApiClient.getUrl(endpoint);
+        }
+        return '/' + endpoint;
     }
 
     function buildRequestHeaders() {
@@ -1639,6 +1689,7 @@
                 renderMeta();
                 renderPagination();
                 updateRefreshButtonState();
+                hideJellyfinLoading();
             });
     }
 
@@ -1770,12 +1821,6 @@
             .catch(function(e){ refs.metadataStatus.textContent = getFrontendText('failed') + e.message; });
     }
 
-    var frontendTexts = {
-        en: {loading:'Loading...',results:'Results: ',sources:' | Sources: ',failed:'Search failed: ',age:'Age',height:'Height',bust:'Bust',waist:'Waist',hip:'Hip',videos:'Videos',open:'Open source',noImage:'No image',noResults:'No results'},
-        zh: {loading:'正在加载……',results:'结果：',sources:' | 来源：',failed:'搜索失败：',age:'年龄',height:'身高',bust:'胸围',waist:'腰围',hip:'臀围',videos:'影片数',open:'打开来源',noImage:'无图片',noResults:'没有找到结果'}
-    };
-    function getFrontendText(key){ var chinese=state.uiLanguage==='Chinese' || (state.uiLanguage==='Auto' && (navigator.language||'').toLowerCase().indexOf('zh')===0); return (chinese?frontendTexts.zh:frontendTexts.en)[key] || key; }
-
     function runSearch() {
         if (!refs) {
             return;
@@ -1824,6 +1869,10 @@
     function renderActorsHomeMode() {
         var page = findHomePage();
         if (!page) {
+            // On cold reload (Ctrl + F5), home page DOM may still be initializing
+            window.setTimeout(function () {
+                syncCastCrewRouteView();
+            }, 100);
             return;
         }
 
@@ -1836,11 +1885,21 @@
 
         host.style.display = '';
         hideNativeHomeFavoritesNav();
+        hideJellyfinLoading();
 
         if (!initializeActorsState()) {
+            if (!state.initRetryCount) state.initRetryCount = 0;
+            if (state.initRetryCount < 20) {
+                state.initRetryCount++;
+                window.setTimeout(function () {
+                    syncCastCrewRouteView();
+                }, 200);
+                return;
+            }
             if (refs) {
                 showState('No active Jellyfin web session found. Sign in and reload this page.', true);
                 refs.meta.textContent = '';
+                hideJellyfinLoading();
             }
 
             return;
@@ -1853,7 +1912,11 @@
         // Issue #3: fetch on first load or if container was recreated (no castcrewLoaded flag)
         if (!host.dataset.castcrewLoaded) {
             host.dataset.castcrewLoaded = 'true';
-            fetchActors();
+            fetchActors().finally(function () {
+                hideJellyfinLoading();
+            });
+        } else {
+            hideJellyfinLoading();
         }
     }
 
@@ -1876,6 +1939,7 @@
     function syncCastCrewRouteView() {
         if (isActorsRoute()) {
             renderActorsHomeMode();
+            hideJellyfinLoading();
             return;
         }
 
