@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>CastCrew Configuration</title>
+    <title id="pageTitle">CastCrew Configuration</title>
 </head>
 <body>
 <div data-role="page" id="castCrewConfigurationPage" class="page type-interior pluginConfigurationPage fullWidthContent">
@@ -10,49 +10,49 @@
             <div class="sectionTitleContainer">
                 <h2 class="sectionTitle">CastCrew <span id="pluginVersionLabel" style="font-size: 0.7em; font-weight: 400; opacity: 0.8;"></span></h2>
             </div>
-            <div class="fieldDescription"><a href="https://github.com/Zieng/Jellyfin-Plugin-CastCrew" target="_blank" rel="noreferrer noopener">Project homepage</a></div>
+            <div class="fieldDescription"><a id="projectHomepage" href="https://github.com/Zieng/Jellyfin-Plugin-CastCrew" target="_blank" rel="noreferrer noopener">Project homepage</a></div>
         </div>
         <hr class="solid">
 
         <form id="castCrewConfigurationForm">
             <div class="inputContainer">
-                <label class="inputLabel inputLabelUnfocused" for="defaultPageSize">Default Page Size</label>
+                <label id="defaultPageSizeLabel" class="inputLabel inputLabelUnfocused" for="defaultPageSize">Default Page Size</label>
                 <input is="emby-input" id="defaultPageSize" type="number" min="10" max="200" step="1" />
-                <div class="fieldDescription">Used by the Actors page if no explicit page size is provided.</div>
+                <div id="defaultPageSizeDesc" class="fieldDescription">Used by the Actors page if no explicit page size is provided.</div>
             </div>
 
             <div class="inputContainer">
-                <label class="inputLabel inputLabelUnfocused" for="defaultSortBy">Default Sort</label>
+                <label id="defaultSortByLabel" class="inputLabel inputLabelUnfocused" for="defaultSortBy">Default Sort</label>
                 <select is="emby-select" id="defaultSortBy" class="emby-select-withcolor emby-select">
-                    <option value="Name">Name</option>
-                    <option value="DateCreated">Recently Added</option>
+                    <option id="sortNameOption" value="Name">Name</option>
+                    <option id="sortDateOption" value="DateCreated">Recently Added</option>
                 </select>
             </div>
 
             <div class="checkboxContainer checkboxContainer-withDescription">
                 <label>
                     <input id="enableCastCrewMainMenuEntry" is="emby-checkbox" type="checkbox" />
-                    <span>Show Cast & Crew entry in the top banner</span>
+                    <span id="mainMenuLabel">Show Cast &amp; Crew entry in the top banner</span>
                 </label>
-                <div class="fieldDescription">Adds/removes a Cast & Crew link in the top banner (near Home/Favorites). A Jellyfin web reload may be required. If Jellyfin web assets are hosted from a read-only install path (for example Program Files on Windows or /Applications on macOS), run Jellyfin with a writable --webdir.</div>
+                <div id="mainMenuDesc" class="fieldDescription">Adds/removes a Cast &amp; Crew link in the top banner (near Home/Favorites). A Jellyfin web reload may be required. If Jellyfin web assets are hosted from a read-only install path (for example Program Files on Windows or /Applications on macOS), run Jellyfin with a writable --webdir.</div>
             </div>
 
             <div class="checkboxContainer checkboxContainer-withDescription">
                 <label>
                     <input id="enableDebugLogging" is="emby-checkbox" type="checkbox" />
-                    <span>Enable verbose CastCrew debug logging</span>
+                    <span id="debugLoggingLabel">Enable verbose CastCrew debug logging</span>
                 </label>
-                <div class="fieldDescription">When enabled, CastCrew writes detailed logs for API requests, query filtering, startup/web sync, and person-library mapping.</div>
+                <div id="debugLoggingDesc" class="fieldDescription">When enabled, CastCrew writes detailed logs for API requests, query filtering, startup/web sync, and person-library mapping.</div>
             </div>
 
             <div class="inputContainer">
-                <label class="inputLabel inputLabelUnfocused" for="detailRoutePreference">Person Detail Route Preference</label>
+                <label id="detailRouteLabel" class="inputLabel inputLabelUnfocused" for="detailRoutePreference">Person Detail Route Preference</label>
                 <select is="emby-select" id="detailRoutePreference" class="emby-select-withcolor emby-select">
-                    <option value="Auto">Auto Detect</option>
-                    <option value="HashBang">Use #!/ routes</option>
-                    <option value="Hash">Use #/ routes</option>
+                    <option id="routeAutoOption" value="Auto">Auto Detect</option>
+                    <option id="routeHashBangOption" value="HashBang">Use #!/ routes</option>
+                    <option id="routeHashOption" value="Hash">Use #/ routes</option>
                 </select>
-                <div class="fieldDescription">Controls fallback navigation for person detail pages across different jellyfin-web builds.</div>
+                <div id="detailRouteDesc" class="fieldDescription">Controls fallback navigation for person detail pages across different jellyfin-web builds.</div>
             </div>
 
             <div class="verticalSection">
@@ -98,27 +98,27 @@
 
             <div class="verticalSection">
                 <div class="folders">
-                    <h1 style="margin:.5em 0">Included Libraries</h1>
-                    <div class="fieldDescription" style="margin-bottom: 0.5em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
-                    <div class="fieldDescription" style="margin-bottom: 0.5em;">Select a media library from the list, then click + to include it.</div>
+                    <h1 id="includedLibrariesTitle" style="margin:.5em 0">Included Libraries</h1>
+                    <div id="includedLibrariesDesc" class="fieldDescription" style="margin-bottom: 0.5em;">Select which media libraries to include when displaying Cast &amp; Crew. If none are selected, all libraries are used.</div>
+                    <div id="libraryPickerDesc" class="fieldDescription" style="margin-bottom: 0.5em;">Select a media library from the list, then click + to include it.</div>
                     <div style="display:flex;align-items:center;gap:0.5em;margin-bottom:0.75em;">
                         <div class="selectContainer" style="margin:0;flex:1 1 auto;min-width:16rem;">
                             <select is="emby-select" id="libraryPicker" class="emby-select-withcolor emby-select" style="min-width: 16rem; width: 100%;">
-                                <option value="">Loading media libraries...</option>
+                                <option id="libraryLoadingOption" value="">Loading media libraries...</option>
                             </select>
                         </div>
-                        <button is="emby-button" id="addLibraryButton" type="button" class="fab btnAddFolder submit" title="Add media library to included list">
+                        <button is="emby-button" id="addLibraryButton" type="button" class="fab btnAddFolder submit" title="Add media library to included list" aria-label="Add media library to included list">
                             <span class="material-icons add" aria-hidden="true"></span>
                         </button>
                     </div>
                 </div>
                 <div id="librarySelectionHint" class="fieldDescription" style="margin-bottom: 0.5em;">Libraries currently included are listed below. If none are listed, all libraries are included.</div>
                 <div id="selectedLibrariesContainer" class="paperList folderList hide" style="margin-bottom: 1em;"></div>
-                <div class="fieldDescription">The person-library mapping refreshes automatically whenever settings are saved and when your media library content changes.</div>
+                <div id="mappingDesc" class="fieldDescription">The person-library mapping refreshes automatically whenever settings are saved and when your media library content changes.</div>
             </div>
 
             <button is="emby-button" id="saveConfigButton" type="submit" class="raised button-submit block">
-                <span>Save</span>
+                <span id="saveButtonLabel">Save</span>
             </button>
         </form>
     </div>
@@ -330,7 +330,7 @@
                 if (!availableLibraries || availableLibraries.length === 0) {
                     var emptyOption = document.createElement('option');
                     emptyOption.value = '';
-                    emptyOption.textContent = 'No media libraries found';
+                    emptyOption.textContent = (document.getElementById('uiLanguage') && document.getElementById('uiLanguage').value === 'Chinese') ? '未找到媒体库' : 'No media libraries found';
                     picker.appendChild(emptyOption);
                     addButton.disabled = true;
                     return;
@@ -352,7 +352,7 @@
                 if (remainingLibraries.length === 0) {
                     var fullOption = document.createElement('option');
                     fullOption.value = '';
-                    fullOption.textContent = 'All media libraries are already included';
+                    fullOption.textContent = (document.getElementById('uiLanguage') && document.getElementById('uiLanguage').value === 'Chinese') ? '所有媒体库都已包含' : 'All media libraries are already included';
                     picker.appendChild(fullOption);
                     addButton.disabled = true;
                     return;
@@ -375,13 +375,13 @@
                     container.classList.add('hide');
                     container.innerHTML = '';
                     refs.librarySelectionHint.style.display = 'block';
-                    refs.librarySelectionHint.textContent = 'No media libraries currently included. All libraries are included.';
+                    refs.librarySelectionHint.textContent = (document.getElementById('uiLanguage') && document.getElementById('uiLanguage').value === 'Chinese') ? '当前没有选择媒体库，将使用全部媒体库。' : 'No media libraries currently included. All libraries are included.';
                     return;
                 }
 
                 container.classList.remove('hide');
                 refs.librarySelectionHint.style.display = 'block';
-                refs.librarySelectionHint.textContent = 'Libraries currently included:';
+                refs.librarySelectionHint.textContent = (document.getElementById('uiLanguage') && document.getElementById('uiLanguage').value === 'Chinese') ? '当前包含的媒体库：' : 'Libraries currently included:';
 
                 var html = '';
                 for (var i = 0; i < selectedLibraryIds.length; i++) {
@@ -394,7 +394,7 @@
                         html += '<div class="listItemBodyText secondary" dir="ltr">' + escapeHtml(library.CollectionType) + '</div>';
                     }
                     html += '</div>';
-                    html += '<button type="button" is="paper-icon-button-light" class="listItemButton btnRemovePath" data-remove-library-id="' + escapeHtml(libraryId) + '" title="Remove media library">';
+                    html += '<button type="button" is="paper-icon-button-light" class="listItemButton btnRemovePath" data-remove-library-id="' + escapeHtml(libraryId) + '" title="Remove media library" data-i18n-remove="true">';
                     html += '<span class="material-icons remove_circle" aria-hidden="true"></span>';
                     html += '</button>';
                     html += '</div>';
@@ -517,25 +517,28 @@
             }
 
             var translations = {
-                English: { title: 'Metadata Sources', desc: 'Enable each metadata provider independently. Disabled providers are not contacted.', tmdb: 'Enable TMDB', tmdbDesc: 'Requires a TMDB API Bearer Token. Used for actor, director and studio/company search.', token: 'TMDB API Bearer Token', masex: 'Enable MASex', masexDesc: 'Actor list source. The URL is configurable so site routing changes do not require a plugin release.', masexUrl: 'MASex Actor URL', netflav: 'Enable Netflav', netflavDesc: 'Actor source with age, height, bust, waist, hip and video-count filtering when those fields are available.', netflavUrl: 'Netflav Actor URL', language: 'Management Language' },
-                Chinese: { title: '元数据来源', desc: '每个元数据源都可以独立启用或停用。停用的来源不会发起网络请求。', tmdb: '启用 TMDB', tmdbDesc: '需要填写 TMDB API Bearer Token，用于演员、导演和片商/公司搜索。', token: 'TMDB API Bearer Token', masex: '启用 MASex', masexDesc: '演员列表来源。URL 可配置，网站路由变化时无需重新发布插件。', masexUrl: 'MASex 演员 URL', netflav: '启用 Netflav', netflavDesc: '演员来源；如果站点提供对应字段，可按年龄、身高、胸围、腰围、臀围和影片数筛选。', netflavUrl: 'Netflav 演员 URL', language: '管理界面语言' }
+                English: {
+                    pageTitle: 'CastCrew Configuration', projectHomepage: 'Project homepage', defaultPageSize: 'Default Page Size', defaultPageSizeDesc: 'Used by the Actors page if no explicit page size is provided.', defaultSortBy: 'Default Sort', sortName: 'Name', sortDate: 'Recently Added', mainMenu: 'Show Cast & Crew entry in the top banner', mainMenuDesc: 'Adds/removes a Cast & Crew link in the top banner (near Home/Favorites). A Jellyfin web reload may be required. If Jellyfin web assets are hosted from a read-only install path (for example Program Files on Windows or /Applications on macOS), run Jellyfin with a writable --webdir.', debugLogging: 'Enable verbose CastCrew debug logging', debugLoggingDesc: 'When enabled, CastCrew writes detailed logs for API requests, query filtering, startup/web sync, and person-library mapping.', detailRoute: 'Person Detail Route Preference', routeAuto: 'Auto Detect', routeHashBang: 'Use #!/ routes', routeHash: 'Use #/ routes', detailRouteDesc: 'Controls fallback navigation for person detail pages across different jellyfin-web builds.', title: 'Metadata Sources', desc: 'Enable each metadata provider independently. Disabled providers are not contacted.', tmdb: 'Enable TMDB', tmdbDesc: 'Requires a TMDB API Bearer Token. Used for actor, director and studio/company search.', token: 'TMDB API Bearer Token', masex: 'Enable MASex', masexDesc: 'Actor list source. The URL is configurable so site routing changes do not require a plugin release.', masexUrl: 'MASex Actor URL', netflav: 'Enable Netflav', netflavDesc: 'Actor source with age, height, bust, waist, hip and video-count filtering when those fields are available.', netflavUrl: 'Netflav Actor URL', language: 'Management Language', libraries: 'Included Libraries', librariesDesc: 'Select which media libraries to include when displaying Cast & Crew. If none are selected, all libraries are used.', pickerDesc: 'Select a media library from the list, then click + to include it.', loading: 'Loading media libraries...', hint: 'Libraries currently included are listed below. If none are listed, all libraries are included.', mapping: 'The person-library mapping refreshes automatically whenever settings are saved and when your media library content changes.', addLibrary: 'Add media library to included list', save: 'Save', remove: 'Remove media library' },
+                Chinese: {
+                    pageTitle: 'CastCrew 配置', projectHomepage: '项目主页', defaultPageSize: '默认每页数量', defaultPageSizeDesc: '演员页面未指定每页数量时使用此值。', defaultSortBy: '默认排序', sortName: '姓名', sortDate: '最近添加', mainMenu: '在顶部导航中显示“演员与剧组”入口', mainMenuDesc: '在顶部导航（首页/收藏附近）添加或移除“演员与剧组”入口。可能需要刷新 Jellyfin 网页。如果 Jellyfin Web 文件位于只读目录（例如 Windows 的 Program Files 或 macOS 的 /Applications），请使用可写的 --webdir。', debugLogging: '启用 CastCrew 详细调试日志', debugLoggingDesc: '启用后，CastCrew 会记录 API 请求、查询过滤、启动/网页同步以及人物库映射的详细日志。', detailRoute: '人物详情页路由偏好', routeAuto: '自动检测', routeHashBang: '使用 #!/ 路由', routeHash: '使用 #/ 路由', detailRouteDesc: '控制不同 jellyfin-web 版本的人物详情页备用导航方式。', title: '元数据来源', desc: '每个元数据源都可以独立启用或停用。停用的来源不会发起网络请求。', tmdb: '启用 TMDB', tmdbDesc: '需要填写 TMDB API Bearer Token，用于演员、导演和片商/公司搜索。', token: 'TMDB API Bearer Token', masex: '启用 MASEx', masexDesc: '演员列表来源。URL 可配置，网站路由变化时无需重新发布插件。', masexUrl: 'MASEx 演员 URL', netflav: '启用 Netflav', netflavDesc: '演员来源；如果站点提供对应字段，可按年龄、身高、胸围、腰围、臀围和影片数筛选。', netflavUrl: 'Netflav 演员 URL', language: '管理界面语言', libraries: '包含的媒体库', librariesDesc: '选择要在“演员与剧组”中显示的媒体库。如果未选择任何媒体库，则使用全部媒体库。', pickerDesc: '从列表选择媒体库，然后点击 + 添加。', loading: '正在加载媒体库……', hint: '当前包含的媒体库显示在下方。如果没有列出任何媒体库，则使用全部媒体库。', mapping: '保存设置或媒体库内容发生变化时，人物与媒体库的映射会自动刷新。', addLibrary: '添加媒体库', save: '保存', remove: '移除媒体库' }
             };
 
             function applyLanguage(value) {
                 var lang = value === 'Chinese' ? 'Chinese' : value === 'English' ? 'English' : (navigator.language || '').toLowerCase().indexOf('zh') === 0 ? 'Chinese' : 'English';
                 var t = translations[lang];
-                document.getElementById('metadataSourcesTitle').textContent = t.title;
-                document.getElementById('metadataSourcesDescription').textContent = t.desc;
-                document.getElementById('enableTmdbLabel').textContent = t.tmdb;
-                document.getElementById('tmdbDescription').textContent = t.tmdbDesc;
-                document.getElementById('tmdbTokenLabel').textContent = t.token;
-                document.getElementById('enableMasexLabel').textContent = t.masex;
-                document.getElementById('masexDescription').textContent = t.masexDesc;
-                document.getElementById('masexUrlLabel').textContent = t.masexUrl;
-                document.getElementById('enableNetflavLabel').textContent = t.netflav;
-                document.getElementById('netflavDescription').textContent = t.netflavDesc;
-                document.getElementById('netflavUrlLabel').textContent = t.netflavUrl;
-                document.getElementById('uiLanguageLabel').textContent = t.language;
+                var set = function (id, prop, text) { var el = document.getElementById(id); if (el) el[prop || 'textContent'] = text; };
+                document.documentElement.lang = lang === 'Chinese' ? 'zh-CN' : 'en';
+                set('pageTitle', 'textContent', t.pageTitle); set('projectHomepage', 'textContent', t.projectHomepage);
+                set('defaultPageSizeLabel', 'textContent', t.defaultPageSize); set('defaultPageSizeDesc', 'textContent', t.defaultPageSizeDesc);
+                set('defaultSortByLabel', 'textContent', t.defaultSortBy); set('sortNameOption', 'textContent', t.sortName); set('sortDateOption', 'textContent', t.sortDate);
+                set('mainMenuLabel', 'textContent', t.mainMenu); set('mainMenuDesc', 'textContent', t.mainMenuDesc);
+                set('debugLoggingLabel', 'textContent', t.debugLogging); set('debugLoggingDesc', 'textContent', t.debugLoggingDesc);
+                set('detailRouteLabel', 'textContent', t.detailRoute); set('routeAutoOption', 'textContent', t.routeAuto); set('routeHashBangOption', 'textContent', t.routeHashBang); set('routeHashOption', 'textContent', t.routeHash); set('detailRouteDesc', 'textContent', t.detailRouteDesc);
+                set('metadataSourcesTitle', 'textContent', t.title); set('metadataSourcesDescription', 'textContent', t.desc); set('enableTmdbLabel', 'textContent', t.tmdb); set('tmdbDescription', 'textContent', t.tmdbDesc); set('tmdbTokenLabel', 'textContent', t.token); set('enableMasexLabel', 'textContent', t.masex); set('masexDescription', 'textContent', t.masexDesc); set('masexUrlLabel', 'textContent', t.masexUrl); set('enableNetflavLabel', 'textContent', t.netflav); set('netflavDescription', 'textContent', t.netflavDesc); set('netflavUrlLabel', 'textContent', t.netflavUrl); set('uiLanguageLabel', 'textContent', t.language);
+                set('includedLibrariesTitle', 'textContent', t.libraries); set('includedLibrariesDesc', 'textContent', t.librariesDesc); set('libraryPickerDesc', 'textContent', t.pickerDesc); set('libraryLoadingOption', 'textContent', t.loading); set('librarySelectionHint', 'textContent', t.hint); set('mappingDesc', 'textContent', t.mapping); set('addLibraryButton', 'title', t.addLibrary); set('addLibraryButton', 'ariaLabel', t.addLibrary); set('saveButtonLabel', 'textContent', t.save);
+                document.querySelectorAll('[data-remove-library-id]').forEach(function (el) { el.title = t.remove; });
+                renderLibraryPicker();
+                renderSelectedLibraries();
             }
 
             function applyConfig(config) {

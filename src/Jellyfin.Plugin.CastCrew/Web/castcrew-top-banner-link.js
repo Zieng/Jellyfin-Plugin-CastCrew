@@ -40,7 +40,9 @@
         selectedLibraryId: '',
         availableLibraries: [],
         libraryMappingLastSyncedUtc: null,
-        mappingRefreshInProgress: false
+        mappingRefreshInProgress: false,
+        uiLanguage: 'Auto',
+        metadataMode: false
     };
 
     var refs = null;
@@ -597,7 +599,11 @@
             '.castcrew-filter-label { display: block; color: var(--castcrew-menu-text); opacity: .85; font-size: .78em; margin-top: .55em; margin-bottom: .25em; }',
             '.castcrew-filter-select { width: 100%; background: var(--castcrew-control-bg-strong); border: 1px solid var(--castcrew-control-border); color: var(--castcrew-menu-text); border-radius: .35em; padding: .45em .55em; min-height: 2.1em; }',
             '.castcrew-select option, .castcrew-filter-select option { background: var(--castcrew-menu-bg); color: var(--castcrew-menu-text); }',
-            '.castcrew-pagination { margin-top: 1em; display: flex; align-items: center; justify-content: center; gap: .8em; }'
+            '.castcrew-pagination { margin-top: 1em; display: flex; align-items: center; justify-content: center; gap: .8em; }',
+            '.castcrew-metadata-panel { margin-top: .5em; }',
+            '.castcrew-metadata-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:.6em; margin-bottom:.7em; }',
+            '.castcrew-metadata-grid input,.castcrew-metadata-grid select { width:100%; box-sizing:border-box; }',
+            '.castcrew-metadata-label { display:block; font-size:.78em; opacity:.8; margin-bottom:.2em; }'
         ].join('');
 
         document.head.appendChild(style);
@@ -625,6 +631,7 @@
                 '<button class=\"castcrew-tab castcrew-tab-active\" type=\"button\" role=\"tab\" data-tab=\"Actors\" aria-selected=\"true\">Actors</button>' +
                 '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Directors\" aria-selected=\"false\">Directors</button>' +
                 '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Producers\" aria-selected=\"false\">Producers</button>' +
+                '<button class=\"castcrew-tab\" type=\"button\" role=\"tab\" data-tab=\"Metadata\" aria-selected=\"false\">Metadata Search</button>' +
             '</div>' +
             '<div class=\"castcrew-toolbar\">' +
                 '<div class=\"castcrew-toolbar-left\">' +
@@ -662,6 +669,20 @@
                         '</select>' +
                     '</div>' +
                 '</div>' +
+            '</div>' +
+            '<div id=\"castcrewMetadataPanel\" class=\"castcrew-metadata-panel\" hidden>' +
+                '<div class=\"castcrew-metadata-grid\">' +
+                    '<select id=\"castcrewMetadataType\" class=\"castcrew-select\"><option value=\"Actor\">Actors</option><option value=\"Director\">Directors</option><option value=\"Studio\">Studios / Manufacturers</option></select>' +
+                    '<input id=\"castcrewMetadataName\" class=\"castcrew-input\" type=\"search\" placeholder=\"Name\" />' +
+                    '<input id=\"castcrewMetadataMinAge\" class=\"castcrew-input\" type=\"number\" placeholder=\"Min age\" /><input id=\"castcrewMetadataMaxAge\" class=\"castcrew-input\" type=\"number\" placeholder=\"Max age\" />' +
+                    '<input id=\"castcrewMetadataMinHeight\" class=\"castcrew-input\" type=\"number\" placeholder=\"Min height (cm)\" /><input id=\"castcrewMetadataMaxHeight\" class=\"castcrew-input\" type=\"number\" placeholder=\"Max height (cm)\" />' +
+                    '<input id=\"castcrewMetadataMinBust\" class=\"castcrew-input\" type=\"number\" placeholder=\"Min bust\" /><input id=\"castcrewMetadataMaxBust\" class=\"castcrew-input\" type=\"number\" placeholder=\"Max bust\" />' +
+                    '<input id=\"castcrewMetadataMinWaist\" class=\"castcrew-input\" type=\"number\" placeholder=\"Min waist\" /><input id=\"castcrewMetadataMaxWaist\" class=\"castcrew-input\" type=\"number\" placeholder=\"Max waist\" />' +
+                    '<input id=\"castcrewMetadataMinHip\" class=\"castcrew-input\" type=\"number\" placeholder=\"Min hip\" /><input id=\"castcrewMetadataMaxHip\" class=\"castcrew-input\" type=\"number\" placeholder=\"Max hip\" />' +
+                    '<input id=\"castcrewMetadataMinVideoCount\" class=\"castcrew-input\" type=\"number\" placeholder=\"Min videos\" /><input id=\"castcrewMetadataMaxVideoCount\" class=\"castcrew-input\" type=\"number\" placeholder=\"Max videos\" />' +
+                '</div>' +
+                '<div class=\"castcrew-toolbar-left\"><button id=\"castcrewMetadataSearch\" class=\"castcrew-button\" type=\"button\">Search</button><button id=\"castcrewMetadataReset\" class=\"castcrew-button\" type=\"button\">Reset</button></div>' +
+                '<div id=\"castcrewMetadataStatus\" class=\"castcrew-meta\"></div><div id=\"castcrewMetadataResults\" class=\"castcrew-grid\"></div>' +
             '</div>' +
             '<div id=\"castcrewState\" class=\"castcrew-state\" hidden></div>' +
             '<div id=\"castcrewGrid\" class=\"castcrew-grid\" hidden></div>' +
@@ -732,7 +753,14 @@
             descGrid: host.querySelector('#castcrewDescGrid'),
             prevButton: host.querySelector('#castcrewPrevButton'),
             nextButton: host.querySelector('#castcrewNextButton'),
-            pageInfo: host.querySelector('#castcrewPageInfo')
+            pageInfo: host.querySelector('#castcrewPageInfo'),
+            metadataPanel: host.querySelector('#castcrewMetadataPanel'),
+            metadataType: host.querySelector('#castcrewMetadataType'),
+            metadataName: host.querySelector('#castcrewMetadataName'),
+            metadataSearch: host.querySelector('#castcrewMetadataSearch'),
+            metadataReset: host.querySelector('#castcrewMetadataReset'),
+            metadataStatus: host.querySelector('#castcrewMetadataStatus'),
+            metadataResults: host.querySelector('#castcrewMetadataResults')
         };
 
         // Tab click handling
@@ -745,9 +773,18 @@
                 }
 
                 state.activeTab = tabName;
+                state.metadataMode = tabName === 'Metadata';
                 state.pageIndex = 0;
                 state.searchTerm = '';
                 refs.searchInput.value = '';
+                refs.metadataPanel.hidden = !state.metadataMode;
+                refs.searchInput.parentElement.parentElement.style.display = state.metadataMode ? 'none' : '';
+                refs.metadataPanel.style.display = state.metadataMode ? '' : 'none';
+                refs.grid.hidden = state.metadataMode;
+                refs.descGrid.hidden = state.metadataMode;
+                refs.state.hidden = state.metadataMode;
+                refs.prevButton.parentElement.style.display = state.metadataMode ? 'none' : '';
+                if (state.metadataMode) { fetchMetadata(); } else { fetchActors(); }
 
                 tabs.forEach(function (t) {
                     t.classList.remove('castcrew-tab-active');
@@ -829,8 +866,13 @@
             fetchActors();
         });
 
+        refs.metadataSearch.addEventListener('click', fetchMetadata);
+        refs.metadataReset.addEventListener('click', function () { ['metadataName','metadataMinAge','metadataMaxAge','metadataMinHeight','metadataMaxHeight','metadataMinBust','metadataMaxBust','metadataMinWaist','metadataMaxWaist','metadataMinHip','metadataMaxHip','metadataMinVideoCount','metadataMaxVideoCount'].forEach(function(id){ var el=host.querySelector('#castcrew'+id.charAt(0).toUpperCase()+id.slice(1)); if(el) el.value=''; }); fetchMetadata(); });
+        refs.metadataType.addEventListener('change', function () { var disabled=this.value==='Studio'; ['MinAge','MaxAge','MinHeight','MaxHeight','MinBust','MaxBust','MinWaist','MaxWaist','MinHip','MaxHip','MinVideoCount','MaxVideoCount'].forEach(function(n){ var el=host.querySelector('#castcrewMetadata'+n); if(el) el.disabled=disabled; }); });
+
         renderSyncStatus();
         updateRefreshButtonState();
+        loadFrontendLanguage();
     }
 
     function showState(message, isError) {
@@ -1532,6 +1574,37 @@
         });
     }
 
+    function buildMetadataUrl() {
+        var q = new URLSearchParams();
+        var map = { Name:'metadataName', MinAge:'metadataMinAge', MaxAge:'metadataMaxAge', MinHeight:'metadataMinHeight', MaxHeight:'metadataMaxHeight', MinBust:'metadataMinBust', MaxBust:'metadataMaxBust', MinWaist:'metadataMinWaist', MaxWaist:'metadataMaxWaist', MinHip:'metadataMinHip', MaxHip:'metadataMaxHip', MinVideoCount:'metadataMinVideoCount', MaxVideoCount:'metadataMaxVideoCount' };
+        q.set('type', refs.metadataType.value);
+        Object.keys(map).forEach(function(k){ var el=refs.host.querySelector('#castcrew'+map[k].replace(/^metadata/,'Metadata').replace(/^Metadata/,'Metadata')); if(!el) el=refs.host.querySelector('#castcrewMetadata'+k); if(el && el.value) q.set(k.charAt(0).toLowerCase()+k.slice(1), el.value); });
+        q.set('limit','100');
+        var base = window.ApiClient && ApiClient.getUrl ? ApiClient.getUrl('CastCrew/Metadata/Search') : '/CastCrew/Metadata/Search';
+        return base + (base.indexOf('?') >= 0 ? '&' : '?') + q.toString();
+    }
+
+    function fetchMetadata() {
+        if (!refs || !refs.metadataPanel) return;
+        refs.metadataStatus.textContent = getFrontendText('loading');
+        fetch(buildMetadataUrl(), { headers: window.ApiClient && ApiClient.getRequestHeaders ? ApiClient.getRequestHeaders() : {} })
+            .then(function(r){ if(!r.ok) throw Error('HTTP '+r.status); return r.json(); })
+            .then(function(data){
+                refs.metadataStatus.textContent = getFrontendText('results') + (data.TotalRecordCount || 0) + getFrontendText('sources') + (data.EnabledSources || []).join(', ');
+                refs.metadataResults.innerHTML = (data.Items || []).map(function(x){
+                    var meta=[]; if(x.Age) meta.push(getFrontendText('age')+': '+x.Age); if(x.HeightCm) meta.push(getFrontendText('height')+': '+x.HeightCm+'cm'); if(x.BustCm) meta.push(getFrontendText('bust')+': '+x.BustCm); if(x.WaistCm) meta.push(getFrontendText('waist')+': '+x.WaistCm); if(x.HipCm) meta.push(getFrontendText('hip')+': '+x.HipCm); if(x.VideoCount) meta.push(getFrontendText('videos')+': '+x.VideoCount);
+                    return '<article class="castcrew-card"><div class="castcrew-image-wrap">'+(x.ImageUrl?'<img class="castcrew-image" loading="lazy" src="'+escapeHtml(x.ImageUrl)+'">':'<span class="castcrew-placeholder">'+getFrontendText('noImage')+'</span>')+'</div><div class="castcrew-info"><h3 class="castcrew-name">'+escapeHtml(x.Name)+'</h3><div class="castcrew-overview">'+escapeHtml((x.Source||'')+' · '+meta.join(' · '))+'</div>'+(x.ProfileUrl?'<a href="'+escapeHtml(x.ProfileUrl)+'" target="_blank" rel="noreferrer">'+getFrontendText('open')+'</a>':'')+'</div></article>';
+                }).join('') || '<p class="castcrew-section-empty">'+getFrontendText('noResults')+'</p>';
+            })
+            .catch(function(e){ refs.metadataStatus.textContent = getFrontendText('failed') + e.message; });
+    }
+
+    var frontendTexts = {
+        en: {loading:'Loading...',results:'Results: ',sources:' | Sources: ',failed:'Search failed: ',age:'Age',height:'Height',bust:'Bust',waist:'Waist',hip:'Hip',videos:'Videos',open:'Open source',noImage:'No image',noResults:'No results'},
+        zh: {loading:'正在加载……',results:'结果：',sources:' | 来源：',failed:'搜索失败：',age:'年龄',height:'身高',bust:'胸围',waist:'腰围',hip:'臀围',videos:'影片数',open:'打开来源',noImage:'无图片',noResults:'没有找到结果'}
+    };
+    function getFrontendText(key){ var chinese=state.uiLanguage==='Chinese' || (state.uiLanguage==='Auto' && (navigator.language||'').toLowerCase().indexOf('zh')===0); return (chinese?frontendTexts.zh:frontendTexts.en)[key] || key; }
+
     function runSearch() {
         if (!refs) {
             return;
@@ -1540,6 +1613,25 @@
         state.searchTerm = refs.searchInput.value.trim();
         state.pageIndex = 0;
         fetchActors();
+    }
+
+    function applyFrontendLanguage() {
+        if (!refs) return;
+        var zh = state.uiLanguage === 'Chinese' || (state.uiLanguage === 'Auto' && (navigator.language || '').toLowerCase().indexOf('zh') === 0);
+        var tr = zh ? {title:'演员与剧组',actors:'演员',directors:'导演',producers:'制片人',metadata:'元数据搜索',search:'搜索',placeholder:'搜索姓名或描述…',previous:'上一页',next:'下一页',sortNameUp:'姓名 ↑',sortNameDown:'姓名 ↓',newest:'添加时间（最新）',oldest:'添加时间（最早）',random:'随机',filter:'筛选',library:'媒体库',allLibraries:'全部媒体库',favorites:'仅收藏',tags:'标签',allTags:'全部标签',country:'国家/地区',allCountries:'全部国家/地区',refresh:'刷新媒体库映射',settings:'CastCrew 设置',view:'切换视图'} : {title:'Cast & Crew',actors:'Actors',directors:'Directors',producers:'Producers',metadata:'Metadata Search',search:'Search',placeholder:'Search...',previous:'Previous',next:'Next',sortNameUp:'Name ↑',sortNameDown:'Name ↓',newest:'Date Added (Newest)',oldest:'Date Added (Oldest)',random:'Random',filter:'Filter',library:'Library',allLibraries:'All libraries',favorites:'Favorites only',tags:'Tags',allTags:'All tags',country:'Country/Region',allCountries:'All countries/regions',refresh:'Refresh library mapping',settings:'CastCrew settings',view:'Change view'};
+        var set=function(el,prop,val){if(el)el[prop]=val;};
+        set(refs.host.querySelector('.sectionTitle'),'textContent',tr.title); set(refs.searchInput,'placeholder',tr.placeholder); set(refs.searchButton,'textContent',tr.search); set(refs.prevButton,'textContent',tr.previous); set(refs.nextButton,'textContent',tr.next); set(refs.refreshButton,'title',tr.refresh); set(refs.refreshButton,'aria-label',tr.refresh); set(refs.settingsButton,'title',tr.settings); set(refs.settingsButton,'aria-label',tr.settings); set(refs.viewToggle,'title',tr.view); set(refs.viewToggle,'aria-label',tr.view); set(refs.filterButton,'title',tr.filter); set(refs.filterButton,'aria-label',tr.filter);
+        var tabs=Array.prototype.slice.call(refs.host.querySelectorAll('.castcrew-tab')); var tabText={Actors:tr.actors,Directors:tr.directors,Producers:tr.producers,Metadata:tr.metadata}; tabs.forEach(function(tab){var n=tab.getAttribute('data-tab');tab.textContent=tabText[n]||n;});
+        var opts=refs.sortSelect?refs.sortSelect.options:[]; if(opts.length>=5){opts[0].textContent=tr.sortNameUp;opts[1].textContent=tr.sortNameDown;opts[2].textContent=tr.newest;opts[3].textContent=tr.oldest;opts[4].textContent=tr.random;}
+        var lf=refs.libraryFilter;if(lf&&lf.options.length)lf.options[0].textContent=tr.allLibraries; var tf=refs.tagFilter;if(tf&&tf.options.length)tf.options[0].textContent=tr.allTags; var cf=refs.countryFilter;if(cf&&cf.options.length)cf.options[0].textContent=tr.allCountries;
+        var labels=refs.filterMenu?refs.filterMenu.querySelectorAll('.castcrew-filter-label'):[]; if(labels.length>=3){labels[0].textContent=tr.library;labels[1].textContent=tr.tags;labels[2].textContent=tr.country;}
+        var fav=refs.favFilter;if(fav&&fav.parentElement) fav.parentElement.lastChild.textContent=' '+tr.favorites;
+        var m={metadataName:zh?'姓名':'Name',metadataMinAge:zh?'最小年龄':'Min age',metadataMaxAge:zh?'最大年龄':'Max age',metadataMinHeight:zh?'最小身高（cm）':'Min height (cm)',metadataMaxHeight:zh?'最大身高（cm）':'Max height (cm)',metadataMinBust:zh?'最小胸围':'Min bust',metadataMaxBust:zh?'最大胸围':'Max bust',metadataMinWaist:zh?'最小腰围':'Min waist',metadataMaxWaist:zh?'最大腰围':'Max waist',metadataMinHip:zh?'最小臀围':'Min hip',metadataMaxHip:zh?'最大 hip':'Max hip',metadataMinVideoCount:zh?'最少影片数':'Min videos',metadataMaxVideoCount:zh?'最多影片数':'Max videos'}; Object.keys(m).forEach(function(id){var el=refs.host.querySelector('#castcrew'+id.charAt(0).toUpperCase()+id.slice(1));if(el)el.placeholder=m[id];}); if(refs.metadataSearch)refs.metadataSearch.textContent=tr.search;if(refs.metadataReset)refs.metadataReset.textContent=zh?'重置':'Reset';
+    }
+
+    function loadFrontendLanguage() {
+        if (!window.ApiClient || typeof ApiClient.getPluginConfiguration !== 'function') { applyFrontendLanguage(); return; }
+        ApiClient.getPluginConfiguration('a1c3e5f7-2b4d-6e8f-0a1c-3e5f7b9d1e3a').then(function(c){ state.uiLanguage=(c&&c.UiLanguage)||'Auto'; applyFrontendLanguage(); }).catch(function(){ applyFrontendLanguage(); });
     }
 
     function initializeActorsState() {
