@@ -1587,8 +1587,23 @@
     function fetchMetadata() {
         if (!refs || !refs.metadataPanel) return;
         refs.metadataStatus.textContent = getFrontendText('loading');
-        fetch(buildMetadataUrl(), { headers: window.ApiClient && ApiClient.getRequestHeaders ? ApiClient.getRequestHeaders() : {} })
-            .then(function(r){ if(!r.ok) throw Error('HTTP '+r.status); return r.json(); })
+        var url = buildMetadataUrl();
+        var requestPromise;
+        if (window.ApiClient && typeof window.ApiClient.ajax === 'function') {
+            requestPromise = Promise.resolve(window.ApiClient.ajax({
+                type: 'GET',
+                url: url,
+                dataType: 'json'
+            }));
+        } else if (window.ApiClient && typeof window.ApiClient.getJSON === 'function') {
+            requestPromise = window.ApiClient.getJSON(url);
+        } else {
+            requestPromise = fetch(url, { headers: buildRequestHeaders() }).then(function(r){
+                if (!r.ok) throw Error('HTTP '+r.status);
+                return r.json();
+            });
+        }
+        requestPromise
             .then(function(data){
                 refs.metadataStatus.textContent = getFrontendText('results') + (data.TotalRecordCount || 0) + getFrontendText('sources') + (data.EnabledSources || []).join(', ');
                 refs.metadataResults.innerHTML = (data.Items || []).map(function(x){
