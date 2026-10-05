@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Settings, Terminal, Globe, Film, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, Settings, Terminal, Globe, Film, CheckCircle2, Download } from 'lucide-react';
 import { PluginConfiguration } from '../types';
 
 interface HeaderProps {
@@ -57,6 +57,17 @@ export const Header: React.FC<HeaderProps> = ({
           <span>{locale === 'zh' ? '已同步: ' : 'Sync: '}</span>
           <span className="text-white font-mono">{formatSyncTime(lastSynced)}</span>
         </div>
+
+        {/* Download .NET 8 Plugin (DLL & PDB) */}
+        <a
+          href="/download/Jellyfin.Plugin.CastCrew-net8.0.zip"
+          download="Jellyfin.Plugin.CastCrew-net8.0.zip"
+          title={locale === 'zh' ? '下载 Jellyfin 10.10.x (.NET 8) 插件 (DLL & PDB 打包)' : 'Download Jellyfin 10.10.x (.NET 8) Plugin (DLL & PDB)'}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#00a4dc] hover:bg-[#0092c5] text-white rounded-lg shadow-md shadow-[#00a4dc]/20 transition-all cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>{locale === 'zh' ? '下载 net8 插件' : 'Download .NET 8'}</span>
+        </a>
 
         {/* Manual Refresh Button */}
         <button

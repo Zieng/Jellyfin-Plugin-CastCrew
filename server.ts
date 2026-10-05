@@ -648,6 +648,24 @@ app.post('/CastCrew/Metadata/ApplyToLocal', (req: Request, res: Response) => {
   res.json({ success: true, person });
 });
 
+// Download endpoints for precompiled Jellyfin 10.10.x (.NET 8) plugin binaries
+app.use('/download', express.static(path.join(__dirname, 'public', 'download')));
+
+app.get('/api/download/zip', (_req: Request, res: Response) => {
+  const file = path.join(__dirname, 'public', 'download', 'Jellyfin.Plugin.CastCrew-net8.0.zip');
+  res.download(file, 'Jellyfin.Plugin.CastCrew-net8.0.zip');
+});
+
+app.get('/api/download/dll', (_req: Request, res: Response) => {
+  const file = path.join(__dirname, 'public', 'download', 'Jellyfin.Plugin.CastCrew.dll');
+  res.download(file, 'Jellyfin.Plugin.CastCrew.dll');
+});
+
+app.get('/api/download/pdb', (_req: Request, res: Response) => {
+  const file = path.join(__dirname, 'public', 'download', 'Jellyfin.Plugin.CastCrew.pdb');
+  res.download(file, 'Jellyfin.Plugin.CastCrew.pdb');
+});
+
 // 7. Mount Vite middleware or static dist
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
