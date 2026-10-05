@@ -24,7 +24,7 @@ public abstract class HtmlMetadataProvider : IMetadataProvider
     protected abstract string BaseUrl { get; }
     protected abstract bool Enabled(PluginConfiguration configuration);
 
-    public async Task<IReadOnlyList<MetadataPerson>> SearchAsync(MetadataSearchQuery query, CancellationToken cancellationToken)
+    public virtual async Task<IReadOnlyList<MetadataPerson>> SearchAsync(MetadataSearchQuery query, CancellationToken cancellationToken)
     {
         var configuration = CastCrewPlugin.Instance?.Configuration ?? new PluginConfiguration();
         if (!Enabled(configuration) || query.Type != MetadataPersonType.Actor)
