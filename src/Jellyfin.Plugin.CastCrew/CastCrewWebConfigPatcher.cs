@@ -28,7 +28,7 @@ internal static class CastCrewWebConfigPatcher
     private const string CastCrewStandaloneRoute = "/web/cast-crew.html";
     private const string ConfigFileName = "config.json";
     private const string IndexFileName = "index.html";
-    private const string TopBannerScriptTag = "<script src=\"castcrew-top-banner-link.js?v=2.0.0\" defer></script>";
+    private const string TopBannerScriptTag = "<script src=\"castcrew-top-banner-link.js\" defer></script>";
     private const string JellyfinWebDirEnvVar = "JELLYFIN_WEB_DIR";
 
     /// <summary>

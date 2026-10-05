@@ -1737,6 +1737,7 @@
         requestPromise
             .then(function(data){
                 refs.metadataStatus.textContent = getFrontendText('results') + (data.TotalRecordCount || 0) + getFrontendText('sources') + (data.EnabledSources || []).join(', ');
+                var isZh = state.uiLanguage === 'Chinese' || (state.uiLanguage === 'Auto' && (navigator.language || '').toLowerCase().indexOf('zh') === 0);
                 refs.metadataResults.innerHTML = (data.Items || []).map(function(x){
                     var meta=[];
                     if(x.Age) meta.push(getFrontendText('age')+': '+x.Age);
@@ -1748,7 +1749,7 @@
                     var cCode = toCountryCode(x.Country || '');
                     var badge = cCode ? '<span class="castcrew-country-badge">' + escapeHtml(cCode) + '</span>' : '';
                     var srcBadge = x.Source ? '<span style="font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; background:rgba(0,164,220,0.15); color:#00a4dc; margin-right:4px;">' + escapeHtml(x.Source) + '</span>' : '';
-                    var ageSub = x.Age ? '<div class="castcrew-age-sub">' + (chinese ? x.Age + ' 岁' : x.Age + ' yrs') + '</div>' : '';
+                    var ageSub = x.Age ? '<div class="castcrew-age-sub">' + (isZh ? x.Age + ' 岁' : x.Age + ' yrs') + '</div>' : '';
                     return '<article class="castcrew-card" style="cursor:default;">' +
                         '<div class="castcrew-image-wrap">' +
                             (x.ImageUrl ? '<img class="castcrew-image" loading="lazy" src="' + escapeHtml(x.ImageUrl) + '">' : '<span class="castcrew-placeholder">' + getFrontendText('noImage') + '</span>') +
