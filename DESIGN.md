@@ -317,3 +317,9 @@ When working on this codebase as an AI agent:
 ---
 
 *This document is the canonical baseline for all code generation and development tasks.*
+
+## 2.0 External Metadata Layer
+
+CastCrew 2.0 preserves the existing local-library APIs and adds `/CastCrew/Metadata/Search`. The endpoint delegates to independent `IMetadataProvider` implementations for TMDB, MASex, and Netflav. Providers can be enabled independently in plugin configuration; failures are isolated and merged results are de-duplicated by normalized name.
+
+See `DESIGN-CN.md` for the Chinese architecture description and `deploy-CN.md` for build/deployment instructions.

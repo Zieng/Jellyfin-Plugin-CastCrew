@@ -114,3 +114,7 @@ Open the page in a **private/incognito window**. If it appears there, your brows
 ## Development
 
 For architecture details, build commands, API contracts, project structure, and contribution guidance, see **[DESIGN.md](DESIGN.md)**.
+
+## CastCrew 2.0 Metadata Providers
+
+Version 2.0 adds independently configurable TMDB, MASex and Netflav metadata providers. Actor metadata supports name, age, height, bust, waist, hip and video-count ranges. Director and studio/manufacturer searches are supported by name. See [README-CN.md](README-CN.md), [DESIGN-CN.md](DESIGN-CN.md), and [deploy-CN.md](deploy-CN.md).

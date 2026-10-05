@@ -37,6 +37,30 @@ internal sealed class CastCrewConfigJsonMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        var path = context.Request.Path.Value;
+
+        // Directly serve castcrew-top-banner-link.js from the plugin's embedded resources
+        // to bypass read-only web directories and browser disk caching issues
+        if (HttpMethods.IsGet(context.Request.Method) &&
+            (string.Equals(path, "/web/castcrew-top-banner-link.js", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(path, "/castcrew-top-banner-link.js", StringComparison.OrdinalIgnoreCase)))
+        {
+            var resourceStream = typeof(CastCrewPlugin).Assembly
+                .GetManifestResourceStream("Jellyfin.Plugin.CastCrew.Web.castcrew-top-banner-link.js");
+            if (resourceStream != null)
+            {
+                context.Response.ContentType = "application/javascript; charset=utf-8";
+                context.Response.Headers.CacheControl = "no-store, no-cache, must-revalidate";
+                context.Response.Headers.Pragma = "no-cache";
+                context.Response.StatusCode = 200;
+                using (resourceStream)
+                {
+                    await resourceStream.CopyToAsync(context.Response.Body);
+                }
+                return;
+            }
+        }
+
         // Only intercept GET requests to /web/config.json
         if (!HttpMethods.IsGet(context.Request.Method) ||
             !string.Equals(context.Request.Path.Value, ConfigJsonPath, StringComparison.OrdinalIgnoreCase))

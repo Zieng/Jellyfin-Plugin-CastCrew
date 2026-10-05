@@ -1,0 +1,146 @@
+# =============================================================================
+# 通用 .gitattributes 模板
+# 核心作用：统一文本文件换行符为 LF，精准区分文本/二进制文件，消除换行符警告
+# 适用场景：Windows/macOS/Linux 混合开发、跨平台团队协作项目
+# =============================================================================
+
+# --- 1. 全局基础规则 ---
+# 自动识别文本文件，提交/签出全程统一使用 LF 换行符
+* text=auto eol=lf
+
+# --- 2. 明确标记文本类文件（强制 LF 换行）---
+# 主流源代码
+*.c      text eol=lf
+*.cpp    text eol=lf
+*.h      text eol=lf
+*.hpp    text eol=lf
+*.java   text eol=lf
+*.js     text eol=lf
+*.ts     text eol=lf
+*.jsx    text eol=lf
+*.tsx    text eol=lf
+*.py     text eol=lf
+*.go     text eol=lf
+*.rs     text eol=lf
+*.rb     text eol=lf
+*.php    text eol=lf
+*.vue    text eol=lf
+*.css    text eol=lf
+*.scss   text eol=lf
+*.less   text eol=lf
+*.html   text eol=lf
+*.xml    text eol=lf
+*.json   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.toml   text eol=lf
+*.ini    text eol=lf
+*.conf   text eol=lf
+*.cfg    text eol=lf
+
+# 脚本文件
+*.sh     text eol=lf
+*.bash   text eol=lf
+*.zsh    text eol=lf
+*.ps1    text eol=lf
+# 若需兼容极旧版 CMD，可将 bat/cmd 改为 eol=crlf
+*.bat    text eol=lf
+*.cmd    text eol=lf
+
+# 文档与数据
+*.md     text eol=lf
+*.txt    text eol=lf
+*.rst    text eol=lf
+*.adoc   text eol=lf
+*.csv    text eol=lf
+*.tsv    text eol=lf
+*.log    text eol=lf
+
+# Git 自身配置文件
+.gitignore      text eol=lf
+.gitattributes  text eol=lf
+.gitmodules     text eol=lf
+
+# 工程构建与包管理文件
+Dockerfile      text eol=lf
+Makefile        text eol=lf
+*.mk            text eol=lf
+*.gradle        text eol=lf
+*.pom           text eol=lf
+package.json    text eol=lf
+package-lock.json text eol=lf
+pnpm-lock.yaml  text eol=lf
+yarn.lock       text eol=lf
+composer.json   text eol=lf
+composer.lock   text eol=lf
+
+# --- 3. 明确标记二进制文件（禁止换行转换，防止文件损坏）---
+# 图片格式
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.bmp    binary
+*.webp   binary
+*.svg    binary
+*.ico    binary
+*.tif    binary
+*.tiff   binary
+
+# 音视频格式
+*.mp3    binary
+*.mp4    binary
+*.wav    binary
+*.flac   binary
+*.ogg    binary
+*.avi    binary
+*.mov    binary
+*.mkv    binary
+*.webm   binary
+
+# 压缩包格式
+*.zip    binary
+*.rar    binary
+*.7z     binary
+*.tar    binary
+*.gz     binary
+*.tgz    binary
+*.bz2    binary
+*.xz     binary
+
+# 字体格式
+*.ttf    binary
+*.otf    binary
+*.woff   binary
+*.woff2  binary
+*.eot    binary
+
+# 可执行与资源文件
+*.exe    binary
+*.dll    binary
+*.so     binary
+*.dylib  binary
+*.bin    binary
+*.dat    binary
+*.db     binary
+*.sqlite binary
+*.class  binary
+*.jar    binary
+*.war    binary
+*.aar    binary
+*.apk    binary
+*.ipa    binary
+
+# 二进制办公文档
+*.pdf    binary
+*.doc    binary
+*.docx   binary
+*.xls    binary
+*.xlsx   binary
+*.ppt    binary
+*.pptx   binary
+
+# --- 4. 可选特殊规则（按需取消注释启用）---
+# 个别文件强制保持 CRLF（如 Windows 专属旧脚本）
+# *.bat text eol=crlf
+# *.cmd text eol=crlf
