@@ -582,13 +582,17 @@
             '.castcrew-grid.castcrew-list-view .castcrew-card { display: flex; flex-direction: row; }',
             '.castcrew-grid.castcrew-list-view .castcrew-image-wrap { width: 60px; aspect-ratio: 2 / 3; flex-shrink: 0; }',
             '.castcrew-grid.castcrew-list-view .castcrew-info { display: flex; flex-direction: column; justify-content: center; }',
-            '.castcrew-card { border: 1px solid rgba(255,255,255,.16); border-radius: .6em; overflow: hidden; background: rgba(255,255,255,.04); cursor: pointer; text-align: left; color: inherit; }',
-            '.castcrew-card:hover { border-color: rgba(255,255,255,.4); }',
-            '.castcrew-image-wrap { width: 100%; aspect-ratio: 2 / 3; background: rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; }',
+            '.castcrew-card { position: relative; border: 1px solid rgba(255,255,255,.14); border-radius: .75em; overflow: hidden; background: #161c26; cursor: pointer; text-align: left; color: inherit; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }',
+            '.castcrew-card:hover { transform: translateY(-3px); border-color: #00a4dc; box-shadow: 0 8px 24px rgba(0,0,0,.5); }',
+            '.castcrew-image-wrap { position: relative; width: 100%; aspect-ratio: 2 / 3; background: #0f141c; display: flex; align-items: center; justify-content: center; }',
+            '.castcrew-country-badge { position: absolute; top: 8px; right: 8px; background: rgba(15, 20, 28, 0.88); backdrop-filter: blur(6px); color: #00a4dc; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(0, 164, 220, 0.45); box-shadow: 0 2px 6px rgba(0,0,0,.4); letter-spacing: 0.5px; z-index: 2; }',
             '.castcrew-image { width: 100%; height: 100%; object-fit: cover; display: block; }',
             '.castcrew-placeholder { color: rgba(255,255,255,.55); font-size: .9em; }',
-            '.castcrew-info { padding: .6em .7em .8em; }',
-            '.castcrew-name { margin: 0; font-size: 1em; line-height: 1.35; }',
+            '.castcrew-info { padding: .7em .8em .9em; }',
+            '.castcrew-name { margin: 0; font-size: .95em; font-weight: 600; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }',
+            '.castcrew-age-sub { margin-top: 4px; font-size: .8em; color: #00a4dc; font-weight: 500; }',
+            '.castcrew-modal-backdrop { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.75); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 16px; box-sizing: border-box; }',
+            '.castcrew-modal-content { background: #161c26; border: 1px solid #232b38; border-radius: 16px; max-width: 620px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 50px rgba(0,0,0,.8); color: #fff; position: relative; padding: 24px; box-sizing: border-box; }',
             '.castcrew-overview { margin-top: .45em; font-size: .84em; color: rgba(255,255,255,.7); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; min-height: 3.2em; }',
             '.castcrew-section-header { font-size: .9em; color: rgba(255,255,255,.6); margin: 1.2em 0 .5em; padding-bottom: .3em; border-bottom: 1px solid rgba(255,255,255,.1); }',
             '.castcrew-match-count { font-weight: 600; color: rgba(255,255,255,.85); }',
@@ -1207,25 +1211,137 @@
         return routes;
     }
 
+    var countryCodeMap = {
+        'japan': 'JP', '日本': 'JP', 'jp': 'JP', 'jpn': 'JP',
+        'united states': 'US', 'united states of america': 'US', 'usa': 'US', 'us': 'US', '美国': 'US',
+        'united kingdom': 'GB', 'uk': 'GB', 'gb': 'GB', 'gbr': 'GB', 'great britain': 'GB', '英国': 'GB',
+        'hong kong': 'HK', 'hk': 'HK', 'hkg': 'HK', '中国香港': 'HK', '香港': 'HK',
+        'taiwan': 'TW', 'tw': 'TW', 'twn': 'TW', '中国台湾': 'TW', '台湾': 'TW',
+        'china': 'CN', 'cn': 'CN', 'chn': 'CN', '中国': 'CN',
+        'south korea': 'KR', 'korea': 'KR', 'kr': 'KR', 'kor': 'KR', '韩国': 'KR',
+        'france': 'FR', 'fr': 'FR', 'fra': 'FR', '法国': 'FR',
+        'germany': 'DE', 'de': 'DE', 'deu': 'DE', '德国': 'DE',
+        'canada': 'CA', 'ca': 'CA', 'can': 'CA', '加拿大': 'CA',
+        'australia': 'AU', 'au': 'AU', 'aus': 'AU', '澳大利亚': 'AU',
+        'italy': 'IT', 'it': 'IT', 'ita': 'IT', '意大利': 'IT',
+        'spain': 'ES', 'es': 'ES', 'esp': 'ES', '西班牙': 'ES',
+        'chile': 'CL', 'cl': 'CL', 'chl': 'CL', '智利': 'CL'
+    };
+
+    function toCountryCode(raw) {
+        if (!raw) return '';
+        var s = String(raw).trim();
+        var lower = s.toLowerCase();
+        if (countryCodeMap[lower]) return countryCodeMap[lower];
+        if (s.length === 2 && /^[A-Za-z]{2}$/.test(s)) return s.toUpperCase();
+        return s.toUpperCase().slice(0, 2);
+    }
+
+    function formatBirthDate(rawDate, isZh, prodYear) {
+        if (!rawDate && !prodYear) return '';
+        var d = rawDate ? new Date(rawDate) : null;
+        if (d && !isNaN(d.getTime())) {
+            var y = d.getFullYear();
+            var m = d.getMonth() + 1;
+            var day = d.getDate();
+            if (isZh) {
+                return y + '年' + m + '月' + day + '日';
+            }
+            return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+        if (prodYear) {
+            return isZh ? prodYear + '年' : String(prodYear);
+        }
+        return String(rawDate || '');
+    }
+
+    function calculatePersonAge(person) {
+        if (typeof person.Age === 'number' && person.Age > 0) return person.Age;
+        var dateVal = person.PremiereDate || person.BirthDate;
+        if (!dateVal) return null;
+        var d = new Date(dateVal);
+        if (isNaN(d.getTime())) return null;
+        var now = new Date();
+        var age = now.getFullYear() - d.getFullYear();
+        var m = now.getMonth() - d.getMonth();
+        if (m < 0 || (m === 0 && now.getDate() < d.getDate())) {
+            age--;
+        }
+        return (age >= 0 && age <= 130) ? age : null;
+    }
+
+    function showPersonDetailModal(person) {
+        var existing = document.getElementById('castcrewDetailModal');
+        if (existing) existing.remove();
+
+        var isZh = state.uiLanguage === 'Chinese' || (state.uiLanguage === 'Auto' && (navigator.language || '').toLowerCase().indexOf('zh') === 0);
+        var imageUrl = getPrimaryImageUrl(person);
+        var name = person.Name || '';
+        var age = calculatePersonAge(person);
+        var birthDateStr = formatBirthDate(person.PremiereDate || person.BirthDate, isZh, person.ProductionYear);
+        var countryRaw = (person.ProductionLocations && person.ProductionLocations[0]) || person.Country || '';
+        var countryCode = toCountryCode(countryRaw);
+        var overview = person.Overview ? escapeHtml(person.Overview) : (isZh ? '暂无个人简介。' : 'No biography available.');
+
+        var routes = buildPersonRoutes(person.Id);
+        var preferredRoute = routes[0];
+
+        var modal = document.createElement('div');
+        modal.id = 'castcrewDetailModal';
+        modal.className = 'castcrew-modal-backdrop';
+        modal.innerHTML = '' +
+            '<div class="castcrew-modal-content">' +
+                '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">' +
+                    '<div style="display:flex; gap:16px; align-items:center;">' +
+                        '<div style="width:72px; height:108px; border-radius:8px; overflow:hidden; background:#0f141c; flex-shrink:0;">' +
+                            (imageUrl ? '<img src="' + escapeHtml(imageUrl) + '" style="width:100%; height:100%; object-fit:cover;">' : '<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#888; font-size:12px;">No image</div>') +
+                        '</div>' +
+                        '<div>' +
+                            '<div style="display:flex; align-items:center; gap:8px;">' +
+                                '<h2 style="margin:0; font-size:1.25em; font-weight:700;">' + escapeHtml(name) + '</h2>' +
+                                (countryCode ? '<span class="castcrew-country-badge" style="position:static;">' + escapeHtml(countryCode) + '</span>' : '') +
+                            '</div>' +
+                            (age !== null ? '<div style="color:#00a4dc; font-weight:600; font-size:0.9em; margin-top:4px;">' + (isZh ? age + ' 岁' : age + ' yrs') + '</div>' : '') +
+                            (birthDateStr ? '<div style="color:#9da7b3; font-size:0.85em; margin-top:2px;">' + (isZh ? '生日：' : 'Birthday: ') + escapeHtml(birthDateStr) + '</div>' : '') +
+                        '</div>' +
+                    '</div>' +
+                    '<button id="castcrewModalClose" style="background:none; border:none; color:#888; font-size:24px; cursor:pointer; padding:4px 8px; line-height:1;">&times;</button>' +
+                '</div>' +
+                '<div style="margin-top:16px; border-top:1px solid rgba(255,255,255,0.1); padding-top:16px;">' +
+                    '<h4 style="margin:0 0 8px; font-size:0.9em; color:#9da7b3;">' + (isZh ? '简介' : 'Overview') + '</h4>' +
+                    '<div style="font-size:0.9em; line-height:1.6; color:#d1d5db; max-height:200px; overflow-y:auto;">' + overview + '</div>' +
+                '</div>' +
+                '<div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:16px;">' +
+                    '<button id="castcrewModalJump" class="castcrew-button" style="background:#00a4dc; color:#fff; border:none; padding:8px 16px; border-radius:8px; font-weight:600; cursor:pointer;">' + (isZh ? '在 Jellyfin 中查看' : 'View in Jellyfin') + '</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(modal);
+
+        modal.querySelector('#castcrewModalClose').onclick = function () {
+            modal.remove();
+        };
+        modal.onclick = function (e) {
+            if (e.target === modal) modal.remove();
+        };
+        modal.querySelector('#castcrewModalJump').onclick = function () {
+            modal.remove();
+            if (window.Dashboard && typeof window.Dashboard.navigate === 'function') {
+                window.Dashboard.navigate(preferredRoute);
+            } else if (window.location && typeof window.location.hash === 'string') {
+                window.location.hash = preferredRoute;
+            } else {
+                window.location.href = '/web/index.html' + preferredRoute;
+            }
+        };
+    }
+
     function openPersonDetail(person) {
         if (!person || !person.Id) {
             return;
         }
 
-        var routes = buildPersonRoutes(person.Id);
-        var preferredRoute = routes[0];
-
-        if (window.Dashboard && typeof window.Dashboard.navigate === 'function') {
-            window.Dashboard.navigate(preferredRoute);
-            return;
-        }
-
-        if (window.location && typeof window.location.hash === 'string') {
-            window.location.hash = preferredRoute;
-            return;
-        }
-
-        window.location.href = '/web/index.html' + preferredRoute;
+        showPersonDetailModal(person);
     }
 
     function buildSettingsRoute() {
@@ -1280,19 +1396,34 @@
     function renderCardHtml(person) {
         var imageUrl = getPrimaryImageUrl(person);
         var name = person.Name || '';
-        var overview = person.Overview
-            ? escapeHtml(person.Overview)
-            : 'No biography available.';
+        var age = calculatePersonAge(person);
+        var isZh = state.uiLanguage === 'Chinese' || (state.uiLanguage === 'Auto' && (navigator.language || '').toLowerCase().indexOf('zh') === 0);
+        var ageText = (age !== null && age !== undefined) ? (isZh ? age + ' 岁' : age + ' yrs') : '';
+
+        var countryRaw = (person.ProductionLocations && person.ProductionLocations[0]) || person.Country || '';
+        var countryCode = toCountryCode(countryRaw);
+
         var imageHtml = imageUrl
-            ? '<img class=\"castcrew-image\" src=\"' + escapeHtml(imageUrl) + '\" alt=\"' + escapeHtml(name) + '\">'
-            : '<span class=\"castcrew-placeholder\">No image</span>';
+            ? '<img class="castcrew-image" loading="lazy" src="' + escapeHtml(imageUrl) + '" alt="' + escapeHtml(name) + '">'
+            : '<span class="castcrew-placeholder">' + escapeHtml(getFrontendText('noImage')) + '</span>';
+
+        var countryBadge = countryCode
+            ? '<span class="castcrew-country-badge">' + escapeHtml(countryCode) + '</span>'
+            : '';
+
+        var ageHtml = ageText
+            ? '<div class="castcrew-age-sub">' + escapeHtml(ageText) + '</div>'
+            : '';
 
         return '' +
-            '<button class=\"castcrew-card\" type=\"button\" data-person-id=\"' + escapeHtml(person.Id) + '\">' +
-                '<div class=\"castcrew-image-wrap\">' + imageHtml + '</div>' +
-                '<div class=\"castcrew-info\">' +
-                    '<h3 class=\"castcrew-name\">' + escapeHtml(name) + '</h3>' +
-                    '<div class=\"castcrew-overview\">' + overview + '</div>' +
+            '<button class="castcrew-card" type="button" data-person-id="' + escapeHtml(person.Id) + '">' +
+                '<div class="castcrew-image-wrap">' +
+                    imageHtml +
+                    countryBadge +
+                '</div>' +
+                '<div class="castcrew-info">' +
+                    '<h3 class="castcrew-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</h3>' +
+                    ageHtml +
                 '</div>' +
             '</button>';
     }
@@ -1607,8 +1738,32 @@
             .then(function(data){
                 refs.metadataStatus.textContent = getFrontendText('results') + (data.TotalRecordCount || 0) + getFrontendText('sources') + (data.EnabledSources || []).join(', ');
                 refs.metadataResults.innerHTML = (data.Items || []).map(function(x){
-                    var meta=[]; if(x.Age) meta.push(getFrontendText('age')+': '+x.Age); if(x.HeightCm) meta.push(getFrontendText('height')+': '+x.HeightCm+'cm'); if(x.BustCm) meta.push(getFrontendText('bust')+': '+x.BustCm); if(x.WaistCm) meta.push(getFrontendText('waist')+': '+x.WaistCm); if(x.HipCm) meta.push(getFrontendText('hip')+': '+x.HipCm); if(x.VideoCount) meta.push(getFrontendText('videos')+': '+x.VideoCount);
-                    return '<article class="castcrew-card"><div class="castcrew-image-wrap">'+(x.ImageUrl?'<img class="castcrew-image" loading="lazy" src="'+escapeHtml(x.ImageUrl)+'">':'<span class="castcrew-placeholder">'+getFrontendText('noImage')+'</span>')+'</div><div class="castcrew-info"><h3 class="castcrew-name">'+escapeHtml(x.Name)+'</h3><div class="castcrew-overview">'+escapeHtml((x.Source||'')+' · '+meta.join(' · '))+'</div>'+(x.ProfileUrl?'<a href="'+escapeHtml(x.ProfileUrl)+'" target="_blank" rel="noreferrer">'+getFrontendText('open')+'</a>':'')+'</div></article>';
+                    var meta=[];
+                    if(x.Age) meta.push(getFrontendText('age')+': '+x.Age);
+                    if(x.HeightCm) meta.push(getFrontendText('height')+': '+x.HeightCm+'cm');
+                    if(x.BustCm) meta.push(getFrontendText('bust')+': '+x.BustCm);
+                    if(x.WaistCm) meta.push(getFrontendText('waist')+': '+x.WaistCm);
+                    if(x.HipCm) meta.push(getFrontendText('hip')+': '+x.HipCm);
+                    if(x.VideoCount) meta.push(getFrontendText('videos')+': '+x.VideoCount);
+                    var cCode = toCountryCode(x.Country || '');
+                    var badge = cCode ? '<span class="castcrew-country-badge">' + escapeHtml(cCode) + '</span>' : '';
+                    var srcBadge = x.Source ? '<span style="font-size:10px; font-weight:600; padding:2px 6px; border-radius:4px; background:rgba(0,164,220,0.15); color:#00a4dc; margin-right:4px;">' + escapeHtml(x.Source) + '</span>' : '';
+                    var ageSub = x.Age ? '<div class="castcrew-age-sub">' + (chinese ? x.Age + ' 岁' : x.Age + ' yrs') + '</div>' : '';
+                    return '<article class="castcrew-card" style="cursor:default;">' +
+                        '<div class="castcrew-image-wrap">' +
+                            (x.ImageUrl ? '<img class="castcrew-image" loading="lazy" src="' + escapeHtml(x.ImageUrl) + '">' : '<span class="castcrew-placeholder">' + getFrontendText('noImage') + '</span>') +
+                            badge +
+                        '</div>' +
+                        '<div class="castcrew-info">' +
+                            '<div style="display:flex; align-items:center; justify-content:space-between; gap:4px;">' +
+                                '<h3 class="castcrew-name" title="' + escapeHtml(x.Name) + '">' + escapeHtml(x.Name) + '</h3>' +
+                                srcBadge +
+                            '</div>' +
+                            ageSub +
+                            (meta.length ? '<div style="font-size:11px; color:#8b949e; margin-top:4px;">' + escapeHtml(meta.join(' · ')) + '</div>' : '') +
+                            (x.ProfileUrl ? '<div style="margin-top:8px;"><a href="' + escapeHtml(x.ProfileUrl) + '" target="_blank" rel="noreferrer" style="font-size:12px; color:#00a4dc; text-decoration:none; font-weight:500;">' + getFrontendText('open') + ' &rarr;</a></div>' : '') +
+                        '</div>' +
+                    '</article>';
                 }).join('') || '<p class="castcrew-section-empty">'+getFrontendText('noResults')+'</p>';
             })
             .catch(function(e){ refs.metadataStatus.textContent = getFrontendText('failed') + e.message; });
